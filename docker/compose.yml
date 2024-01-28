@@ -1,0 +1,26 @@
+version: '3.3'
+
+services:
+  gwyneth:
+    build: ./dockerfiles/gwyneth/.
+    volumes:
+      - ./etc/gwyneth.yaml:/app/gwyneth.yaml
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "127.0.0.1:8000:80"
+  db:
+    image: mysql:8.0.36-oracle
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_password
+      - MYSQL_USER=gwyneth
+      - MYSQL_PASSWORD=password
+      - MYSQL_DATABASE=gwyneth
+    volumes:
+      - ./var/mysql:/var/lib/mysql:rw
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    user: mysql
+    restart: always
+    stop_grace_period: 1m
+

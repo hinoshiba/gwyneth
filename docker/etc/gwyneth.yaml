@@ -1,0 +1,9 @@
+database:
+  host: db
+  port: 3306
+  database: gwyneth
+  user: gwyneth
+  password: password
+http:
+  host: 127.0.0.1
+  port: 80

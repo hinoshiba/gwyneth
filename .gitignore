@@ -1,2 +1,5 @@
 *.swp
 bin/
+vendor/
+docker/var
+go.sum
