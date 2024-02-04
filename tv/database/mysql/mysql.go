@@ -15,7 +15,7 @@ import (
 
 import (
 	"github.com/hinoshiba/gwyneth/config"
-	"github.com/hinoshiba/gwyneth/tv/database/structs"
+	"github.com/hinoshiba/gwyneth/structs"
 )
 
 const (
