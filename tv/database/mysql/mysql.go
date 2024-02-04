@@ -34,7 +34,7 @@ func NewSession(msn *task.Mission, cfg *config.Database) (*Session, error) {
 
 	self := &Session {
 		msn: msn,
-		mtx: new(sync.Mutex),
+		mtx: new(sync.RWMutex),
 	}
 	if err := self.connect(db_auth); err != nil {
 		self.Close()

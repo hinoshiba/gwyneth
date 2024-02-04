@@ -13,8 +13,9 @@ import (
 )
 
 import (
+	"github.com/hinoshiba/gwyneth"
+	"github.com/hinoshiba/gwyneth/http"
 	"github.com/hinoshiba/gwyneth/config"
-	"github.com/hinoshiba/gwyneth/tv"
 )
 
 const (
@@ -25,21 +26,27 @@ var (
 	Config *config.Config
 )
 
-func gwyneth() error {
+func gwyneth_cmd() error {
 	msn := task.NewMission()
 	defer msn.Done()
 
 	slog.Info("gwyneth starting...")
 
-	t, err := tv.New(msn.New(), Config)
+	g, err := gwyneth.New(msn.New(), Config)
 	if err != nil {
 		return err
 	}
-	defer t.Close()
+	defer g.Close()
+
+	rt, err := http.New(msn.New(), Config.Http, g)
+	if err != nil {
+		return err
+	}
+	defer rt.Close()
 
 	slog.Info("gwyneth started")
 
-	if err := t.Test(); err != nil {
+	if err := g.Test(); err != nil {
 		return err
 	}
 
@@ -78,7 +85,7 @@ func die(s string, msg ...any) {
 }
 
 func main() {
-	if err := gwyneth(); err != nil {
+	if err := gwyneth_cmd(); err != nil {
 		die("%s", err)
 	}
 }

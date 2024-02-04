@@ -85,3 +85,7 @@ func (self *Http) check() error {
 	}
 	return nil
 }
+
+func (self *Http) GetAddr() string {
+	return fmt.Sprintf("%s:%d", self.Host, self.Port)
+}
