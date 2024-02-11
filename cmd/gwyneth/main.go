@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"flag"
-	"time"
 )
 
 import (
@@ -28,9 +27,8 @@ var (
 
 func gwyneth_cmd() error {
 	msn := task.NewMission()
-	defer msn.Done()
-
 	slog.Info("gwyneth starting...")
+	defer slog.Info("gwyneth ending...")
 
 	g, err := gwyneth.New(msn.New(), Config)
 	if err != nil {
@@ -45,13 +43,8 @@ func gwyneth_cmd() error {
 	defer rt.Close()
 
 	slog.Info("gwyneth started")
+	msn.Done()
 
-	if err := g.Test(); err != nil {
-		return err
-	}
-
-	time.Sleep(time.Second * 60)
-	slog.Info("gwyneth ending...")
 	return nil
 }
 

@@ -98,10 +98,10 @@ func (self *Session) connect(db_auth string) error {
 func (self *Session) Close() error {
 	defer self.msn.Done()
 
+	self.msn.Cancel()
+
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
-
-	self.msn.Cancel()
 
 	err := self.db.Close()
 	self.db = nil

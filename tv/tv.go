@@ -1,9 +1,8 @@
 package tv
 
 import (
-	"fmt"
 	"sync"
-	"log/slog"
+//	"log/slog"
 )
 
 import (
@@ -13,13 +12,14 @@ import (
 import (
 	"github.com/hinoshiba/gwyneth/config"
 	"github.com/hinoshiba/gwyneth/tv/database"
+	"github.com/hinoshiba/gwyneth/structs"
 )
 
 type TimeVortex struct {
 	db  database.Session
 
 	msn *task.Mission
-	mtx *sync.Mutex
+	mtx *sync.RWMutex
 }
 
 func New(msn *task.Mission, cfg *config.Config) (*TimeVortex, error) {
@@ -32,7 +32,7 @@ func New(msn *task.Mission, cfg *config.Config) (*TimeVortex, error) {
 	return &TimeVortex{
 		db: db,
 		msn: msn,
-		mtx: new(sync.Mutex),
+		mtx: new(sync.RWMutex),
 	}, nil
 }
 
@@ -41,28 +41,41 @@ func (self *TimeVortex) Close() error {
 
 	self.msn.Cancel()
 
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
 	return self.db.Close()
 }
 
-func (self *TimeVortex) Test() error {
-	st, err := self.db.AddSourceType("john", "", false)
-	if err != nil {
-		return err
-	}
-	slog.Debug(fmt.Sprintf("%s", st))
-	sts, err := self.db.GetSourceTypes()
-	if err != nil {
-		return err
-	}
-	slog.Debug(fmt.Sprintf("%s", sts))
-	if err := self.db.DeleteSourceType(st.Id()); err != nil {
-		return err
-	}
-	slog.Debug("deleted")
-	sts, err = self.db.GetSourceTypes()
-	if err != nil {
-		return err
-	}
-	slog.Debug(fmt.Sprintf("%s", sts))
-	return nil
+func (self *TimeVortex) AddSourceType(name string, cmd string, is_user_creation bool) (*structs.SourceType, error) {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	return self.addSourceType(name, cmd, is_user_creation)
+}
+
+func (self *TimeVortex) addSourceType(name string, cmd string, is_user_creation bool) (*structs.SourceType, error) {
+	return self.db.AddSourceType(name, cmd, is_user_creation)
+}
+
+func (self *TimeVortex) GetSourceTypes() ([]*structs.SourceType, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	return self.getSourceTypes()
+}
+
+func (self *TimeVortex) getSourceTypes() ([]*structs.SourceType, error) {
+	return self.db.GetSourceTypes()
+}
+
+func (self *TimeVortex) DeleteSourceType(id *structs.Id) error {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	return self.deleteSourceType(id)
+}
+
+func (self *TimeVortex) deleteSourceType(id *structs.Id) error {
+	return self.db.DeleteSourceType(id)
 }

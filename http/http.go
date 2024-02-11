@@ -55,6 +55,10 @@ func (self *Router) map_route(g *gwyneth.Gwyneth) error {
 			"message": "Hello World",
 		})
 	})
+
+	self.engine.GET("/source_type", getHandlerGetSourceTypes(g))
+	self.engine.POST("/source_type", getHandlerAddSourceType(g))
+	self.engine.DELETE("/source_type", getHandlerDeleteSourceType(g))
 	return nil
 }
 
@@ -73,4 +77,31 @@ func (self *Router) run() error {
 		self.engine.RunListener(ln)
 	}(c_msn, ln)
 	return nil
+}
+
+func getHandlerAddSourceType(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Hello World",
+		})
+	}
+//func (self *Gwyneth) AddSourceType(name string, cmd string, is_user_creation bool) (*structs.SourceType, error) {
+}
+
+func getHandlerGetSourceTypes(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Hello World",
+		})
+	}
+//func (self *TimeVortex) GetSourceTypes() ([]*structs.SourceType, error) {
+}
+
+func getHandlerDeleteSourceType(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Hello World",
+		})
+	}
+//func (self *TimeVortex) DeleteSourceType(id *structs.Id) error {
 }

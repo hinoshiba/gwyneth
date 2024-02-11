@@ -7,6 +7,7 @@ import (
 import (
 	"github.com/hinoshiba/gwyneth/config"
 	"github.com/hinoshiba/gwyneth/tv"
+	"github.com/hinoshiba/gwyneth/structs"
 )
 
 type Gwyneth struct {
@@ -33,6 +34,14 @@ func (self *Gwyneth) Close() error {
 	return self.tv.Close()
 }
 
-func (self *Gwyneth) Test() error {
-	return self.tv.Test()
+func (self *Gwyneth) AddSourceType(name string, cmd string, is_user_creation bool) (*structs.SourceType, error) {
+	return self.tv.AddSourceType(name, cmd, is_user_creation)
+}
+
+func (self *Gwyneth) GetSourceTypes() ([]*structs.SourceType, error) {
+	return self.tv.GetSourceTypes()
+}
+
+func (self *Gwyneth) DeleteSourceType(id *structs.Id) error {
+	return self.tv.DeleteSourceType(id)
 }
