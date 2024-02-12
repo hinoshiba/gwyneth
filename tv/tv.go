@@ -69,6 +69,17 @@ func (self *TimeVortex) getSourceTypes() ([]*structs.SourceType, error) {
 	return self.db.GetSourceTypes()
 }
 
+func (self *TimeVortex) GetSourceType(id *structs.Id) (*structs.SourceType, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	return self.getSourceType(id)
+}
+
+func (self *TimeVortex) getSourceType(id *structs.Id) (*structs.SourceType, error) {
+	return self.db.GetSourceType(id)
+}
+
 func (self *TimeVortex) DeleteSourceType(id *structs.Id) error {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
@@ -78,4 +89,59 @@ func (self *TimeVortex) DeleteSourceType(id *structs.Id) error {
 
 func (self *TimeVortex) deleteSourceType(id *structs.Id) error {
 	return self.db.DeleteSourceType(id)
+}
+
+func (self *TimeVortex) AddSource(title string, src_type *structs.SourceType, val string) (*structs.Source, error) {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	return self.addSource(title, src_type, val)
+}
+
+func (self *TimeVortex) addSource(title string, src_type *structs.SourceType, val string) (*structs.Source, error) {
+	return self.db.AddSource(title, src_type.Id(), val)
+}
+
+func (self *TimeVortex) GetSources() ([]*structs.Source, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	return self.getSources()
+}
+
+func (self *TimeVortex) getSources() ([]*structs.Source, error) {
+	return self.db.GetSources()
+}
+
+func (self *TimeVortex) FindSource(kw string) ([]*structs.Source, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	return self.findSource(kw)
+}
+
+func (self *TimeVortex) findSource(kw string) ([]*structs.Source, error) {
+	return self.db.FindSource(kw)
+}
+
+func (self *TimeVortex) GetSource(id *structs.Id) (*structs.Source, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	return self.getSource(id)
+}
+
+func (self *TimeVortex) getSource(id *structs.Id) (*structs.Source, error) {
+	return self.db.GetSource(id)
+}
+
+func (self *TimeVortex) DeleteSource(id *structs.Id) error {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	return self.deleteSource(id)
+}
+
+func (self *TimeVortex) deleteSource(id *structs.Id) error {
+	return self.db.DeleteSource(id)
 }

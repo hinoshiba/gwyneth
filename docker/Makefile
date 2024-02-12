@@ -6,6 +6,8 @@ build:
 	make -C ../ d-build
 	mkdir -p ./dockerfiles/gwyneth/bin/
 	cp ../bin/gwyneth ./dockerfiles/gwyneth/bin/gwyneth
+	rm -rf ./dockerfiles/gwyneth/http
+	cp -rf ../http ./dockerfiles/gwyneth/http
 	docker compose build
 
 .PHONY: up
@@ -19,5 +21,6 @@ down:
 .PHONY:clean
 clean:
 	rm -rf ./dockerfiles/gwyneth/bin/
+	rm -rf ./dockerfiles/gwyneth/http
 	rm -rf ./var/mysql
 	docker compose down

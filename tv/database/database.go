@@ -22,18 +22,16 @@ var (
 type Session interface {
 	Close() error
 	AddSourceType(string, string, bool) (*structs.SourceType, error)
+	GetSourceType(*structs.Id) (*structs.SourceType, error)
 	GetSourceTypes() ([]*structs.SourceType, error)
 	DeleteSourceType(*structs.Id) error
+
+	AddSource(string, *structs.Id, string) (*structs.Source, error)
+	GetSource(*structs.Id) (*structs.Source, error)
+	GetSources() ([]*structs.Source, error)
+	FindSource(string) ([]*structs.Source, error)
+	DeleteSource(*structs.Id) error
 	/*
-	GetSourceType()
-	DeleteSourceType()
-
-	AddSource()
-	GetSources()
-	FindSource()
-	GetSource()
-	DeleteSource()
-
 	AddArticle()
 	BatchAddArticle()
 	LookupArticles()

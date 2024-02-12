@@ -221,11 +221,200 @@ func (self *Session) GetSourceTypes() ([]*structs.SourceType, error) {
 	return source_types, nil
 }
 
+func (self *Session) GetSourceType(id *structs.Id) (*structs.SourceType, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	return self.getSourceType(id)
+}
+
+func (self *Session) getSourceType(id *structs.Id) (*structs.SourceType, error) {
+	rows, err := self.db.Query("SELECT * FROM source_type WHERE id = ?", id.Value())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var id_base []byte
+	var name string
+	var cmd string
+	var user_create bool
+
+	for rows.Next() {
+		if err = rows.Scan(&id_base, &name, &cmd, &user_create); err != nil {
+			return nil, err
+		}
+		id = structs.NewId(id_base)
+		st := structs.NewSourceType(id, name, cmd, user_create)
+
+		if err = rows.Err(); err != nil {
+			return nil, err
+		}
+		return st, nil
+	}
+	return nil, fmt.Errorf("cannot find")
+}
+
 func (self *Session) DeleteSourceType(id *structs.Id) error {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
 	_, err := self.db.ExecContext(self.msn.AsContext(),
 		"DELETE FROM source_type WHERE id = ?", id.Value())
+	return err
+}
+
+func (self *Session) AddSource(title string, src_type_id *structs.Id, source string) (*structs.Source, error) {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	id := structs.NewId(nil)
+
+	_, err := self.db.ExecContext(self.msn.AsContext(),
+		"INSERT INTO source (id, title, type, source) VALUES (?, ?, ?, ?)",
+								id.Value(), title, src_type_id.Value(), source)
+	if err != nil {
+		return nil, err
+	}
+
+	src_type, err := self.getSourceType(src_type_id)
+	if err != nil {
+		return nil, err
+	}
+
+	return structs.NewSource(id, title, src_type, source), nil
+}
+
+func (self *Session) GetSources() ([]*structs.Source, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	rows, err := self.db.Query("SELECT * FROM source")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	srcs := []*structs.Source{}
+	st_cache := make(map[string]*structs.SourceType)
+	for rows.Next() {
+		var id_base []byte
+		var title string
+		var source_type_id_base []byte
+		var source string
+
+		err := rows.Scan(&id_base, &title, &source_type_id_base, &source)
+		if err != nil {
+			return nil, err
+		}
+		id := structs.NewId(id_base)
+		source_type_id := structs.NewId(source_type_id_base)
+
+		st, ok := st_cache[source_type_id.String()]
+		if !ok {
+			var err error
+			st, err = self.getSourceType(source_type_id)
+			if err != nil {
+				return nil, err
+			}
+
+			st_cache[source_type_id.String()] = st
+		}
+
+		srcs = append(srcs, structs.NewSource(id, title, st, source))
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return srcs, nil
+}
+
+func (self *Session) FindSource(kw string) ([]*structs.Source, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	rows, err := self.db.Query("SELECT * FROM source WHERE title = ?", kw)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	srcs := []*structs.Source{}
+	st_cache := make(map[string]*structs.SourceType)
+	for rows.Next() {
+		var id_base []byte
+		var title string
+		var source_type_id_base []byte
+		var source string
+
+		err := rows.Scan(&id_base, &title, &source_type_id_base, &source)
+		if err != nil {
+			return nil, err
+		}
+		id := structs.NewId(id_base)
+		source_type_id := structs.NewId(source_type_id_base)
+
+		st, ok := st_cache[source_type_id.String()]
+		if !ok {
+			var err error
+			st, err = self.getSourceType(source_type_id)
+			if err != nil {
+				return nil, err
+			}
+
+			st_cache[source_type_id.String()] = st
+		}
+
+		srcs = append(srcs, structs.NewSource(id, title, st, source))
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return srcs, nil
+}
+
+func (self *Session) GetSource(id *structs.Id) (*structs.Source, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	rows, err := self.db.Query("SELECT * FROM source WHERE id = ?", id.Value())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var id_base []byte
+	var title string
+	var source_type_id_base []byte
+	var source string
+
+	for rows.Next() {
+		if err = rows.Scan(&id_base, &title, &source_type_id_base, &source); err != nil {
+			return nil, err
+		}
+		id = structs.NewId(id_base)
+		source_type_id := structs.NewId(source_type_id_base)
+
+		st, err := self.getSourceType(source_type_id)
+		if err != nil {
+			return nil, err
+		}
+
+		if err = rows.Err(); err != nil {
+			return nil, err
+		}
+		return structs.NewSource(id, title, st, source), nil
+	}
+	return nil, fmt.Errorf("cannot find")
+}
+
+func (self *Session) DeleteSource(id *structs.Id) error {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	_, err := self.db.ExecContext(self.msn.AsContext(),
+		"DELETE FROM source WHERE id = ?", id.Value())
 	return err
 }
