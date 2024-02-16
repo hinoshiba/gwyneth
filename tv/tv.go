@@ -91,15 +91,15 @@ func (self *TimeVortex) deleteSourceType(id *structs.Id) error {
 	return self.db.DeleteSourceType(id)
 }
 
-func (self *TimeVortex) AddSource(title string, src_type *structs.SourceType, val string) (*structs.Source, error) {
+func (self *TimeVortex) AddSource(title string, src_type_id *structs.Id, val string) (*structs.Source, error) {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
-	return self.addSource(title, src_type, val)
+	return self.addSource(title, src_type_id, val)
 }
 
-func (self *TimeVortex) addSource(title string, src_type *structs.SourceType, val string) (*structs.Source, error) {
-	return self.db.AddSource(title, src_type.Id(), val)
+func (self *TimeVortex) addSource(title string, src_type_id *structs.Id, val string) (*structs.Source, error) {
+	return self.db.AddSource(title, src_type_id, val)
 }
 
 func (self *TimeVortex) GetSources() ([]*structs.Source, error) {

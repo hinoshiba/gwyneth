@@ -3,3 +3,4 @@ bin/
 vendor/
 docker/var
 go.sum
+*.DS_Store

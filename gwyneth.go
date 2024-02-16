@@ -99,8 +99,27 @@ func (self *Gwyneth) DeleteSourceType(id *structs.Id) error {
 	return self.tv.DeleteSourceType(id)
 }
 
+func (self *Gwyneth) AddSource(title string, src_type_id *structs.Id, source string) (*structs.Source, error) {
+	return self.tv.AddSource(title, src_type_id, source)
+}
+
+func (self *Gwyneth) GetSource(id *structs.Id) (*structs.Source, error) {
+	return self.tv.GetSource(id)
+}
+
+func (self *Gwyneth) GetSources() ([]*structs.Source, error) {
+	return self.tv.GetSources()
+}
+
+func (self *Gwyneth) FindSource(kw string) ([]*structs.Source, error) {
+	return self.tv.FindSource(kw)
+}
+
+func (self *Gwyneth) DeleteSource(id *structs.Id) error {
+	return self.tv.DeleteSource(id)
+}
+
 /*
-	AddSource(string, *structs.Id, string) (*structs.Source, error)
 	GetSource(*structs.Id) (*structs.Source, error)
 	GetSources() ([]*structs.Source, error)
 	FindSource(string) ([]*structs.Source, error)

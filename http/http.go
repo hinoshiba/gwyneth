@@ -178,9 +178,26 @@ func getHandlerDeleteSourceType(g *gwyneth.Gwyneth) func(*gin.Context) {
 
 func getHandlerAddSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "hi",
-		})
+		var src Source
+		if err := c.ShouldBindJSON(&src); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		slog.Debug(fmt.Sprintf("request is '%v'", src))
+
+		src_type_id, err := structs.ParseStringId(src.Type.Id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		added_src, err := g.AddSource(src.Title, src_type_id, src.Value)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.IndentedJSON(http.StatusOK, convSource(added_src))
 	}
 }
 
