@@ -252,12 +252,16 @@ func (self *Session) getSourceType(id *structs.Id) (*structs.SourceType, error) 
 		}
 		return st, nil
 	}
-	return nil, fmt.Errorf("cannot find")
+	return nil, fmt.Errorf("cannot find the source type.")
 }
 
 func (self *Session) DeleteSourceType(id *structs.Id) error {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
+
+	if _, err := self.getSourceType(id); err != nil {
+		return err
+	}
 
 	_, err := self.db.ExecContext(self.msn.AsContext(),
 		"DELETE FROM source_type WHERE id = ?", id.Value())
@@ -379,6 +383,10 @@ func (self *Session) GetSource(id *structs.Id) (*structs.Source, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
+	return self.getSource(id)
+}
+
+func (self *Session) getSource(id *structs.Id) (*structs.Source, error) {
 	rows, err := self.db.Query("SELECT * FROM source WHERE id = ?", id.Value())
 	if err != nil {
 		return nil, err
@@ -407,14 +415,50 @@ func (self *Session) GetSource(id *structs.Id) (*structs.Source, error) {
 		}
 		return structs.NewSource(id, title, st, source), nil
 	}
-	return nil, fmt.Errorf("cannot find")
+	return nil, fmt.Errorf("cannot find the source.")
 }
 
 func (self *Session) DeleteSource(id *structs.Id) error {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
+	if _, err := self.getSource(id); err != nil {
+		return err
+	}
+
 	_, err := self.db.ExecContext(self.msn.AsContext(),
 		"DELETE FROM source WHERE id = ?", id.Value())
 	return err
 }
+
+func (self *Session) AddArticle(title string, body string, link string, timestamp uint64, raw string, src_id *structs.Id) (*structs.Article, error){
+//too: WIP
+}
+
+func (self *Session) LookupArticles(kw string, src_ids []*structs.Id, start uint64, end uint64, limit int64) ([]*structs.Article, error) {
+}
+
+func (self *Session) RemoveArticle(id *structs.Id) error {
+}
+/*
+	AddArticle()
+	BatchAddArticle()
+	LookupArticles()
+	RemoveArticle()
+	AddArticle(string, string, string, uint64, string, *structs.Source) (*structs.Article, error)
+	//BatchAddArticle()
+	LookupArticles(string)
+	RemoveArticle(*structs.Id) error
+
+id BINARY(16) NOT NULL,
+src_id BINARY(16) NOT NULL,
+title LONGTEXT NOT NULL,
+body LONGTEXT NOT NULL,
+link TEXT NOT NULL,
+timestap TIMESTAMP NOT NULL,
+raw LONGTEXT NOT NULL,
+disable BOOLEAN NOT NULL DEFAULT 0,
+PRIMARY KEY (id),
+FOREIGN KEY (src_id) REFERENCES source(id)
+
+	*/

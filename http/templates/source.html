@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Source</title>
+</head>
+<body>
+    <h1>Source</h1>
+    <div id="addForm">
+        <h2>Add New Source</h2>
+        <label for="title">Title:</label>
+        <input type="text" id="title">
+        <label for="value">Value:</label>
+        <input type="text" id="value">
+        <label for="type">Type:</label>
+        <select id="type">
+            <!-- Source Type options will be filled dynamically -->
+        </select>
+        <button onclick="addSource()">Add</button>
+    </div>
+    <hr>
+    <table id="sourcesTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Value</th>
+                <th>Type</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="sourcesTableBody"></tbody>
+    </table>
+    <script>
+        function fetchSourceTypes() {
+            fetch('./api/source_type', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                const selectType = document.getElementById('type');
+                selectType.innerHTML = '';
+                data.forEach(sourceType => {
+                    const option = document.createElement('option');
+                    option.value = sourceType.id;
+                    option.text = sourceType.name;
+                    if (!(sourceType.user_create)) {
+                        option.text = sourceType.name + " (system)";
+                        if (sourceType.name == "rss") {
+                            option.selected = true;
+                        }
+                    }
+                    selectType.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Error fetching source types:', error));
+        }
+
+        function fetchSources() {
+            fetch('./api/source', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                const tableBody = document.getElementById('sourcesTableBody');
+                tableBody.innerHTML = ''; // Clear existing table data
+                data.forEach(source => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${source.id}</td>
+                        <td>${source.title}</td>
+                        <td>${source.value}</td>
+                        <td>${source.type.name}</td>
+                        <td><button onclick="deleteSource('${source.id}')">Delete</button></td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            })
+            .catch(error => console.error('Error fetching sources:', error));
+        }
+
+        function deleteSource(id) {
+            fetch(`./api/source`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ id }),
+            })
+            .then(response => {
+                if (response.ok) {
+                    fetchSources();
+                } else {
+                    console.error('Failed to delete source');
+                }
+            })
+            .catch(error => console.error('Error deleting source:', error));
+        }
+
+        function addSource() {
+            const title = document.getElementById('title').value;
+            const value = document.getElementById('value').value;
+            const type_id = document.getElementById('type').value;
+
+            fetch('./api/source', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({"title": title, "value": value, "type":{"id":type_id }})
+            })
+            .then(response => {
+                if (response.ok) {
+                    fetchSources();
+                    document.getElementById('title').value = '';
+                    document.getElementById('value').value = '';
+                } else {
+                    console.error('Failed to add source');
+                }
+            })
+            .catch(error => console.error('Error adding source:', error));
+        }
+
+        window.onload = function () {
+            fetchSourceTypes();
+            fetchSources();
+        };
+    </script>
+</body>
+</html>
+

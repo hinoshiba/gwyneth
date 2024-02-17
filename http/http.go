@@ -60,8 +60,11 @@ func (self *Router) map_route(g *gwyneth.Gwyneth) error {
 		 "message": "Hi, i'm gwyneth.",
 		})
 	})
-	self.engine.GET("/source_types", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "source_types.html", gin.H{})
+	self.engine.GET("/source_type", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "source_type.html", gin.H{})
+	})
+	self.engine.GET("/source", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "source.html", gin.H{})
 	})
 
 	self.engine.GET("/api/ping", func(c *gin.Context) {
@@ -203,25 +206,58 @@ func getHandlerAddSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 
 func getHandlerGetSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "hi",
-		})
-	/*
-	AddSource(string, *structs.Id, string) (*structs.Source, error)
-	GetSource(*structs.Id) (*structs.Source, error)
-	GetSources() ([]*structs.Source, error)
-	FindSource(string) ([]*structs.Source, error)
-	DeleteSource(*structs.Id) error
-	*/
+		id_base := c.Query("id")
+		if id_base != "" {
+			id, err := structs.ParseStringId(id_base)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			src, err := g.GetSource(id)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			c.IndentedJSON(http.StatusOK, []*Source{convSource(src)})
+			return
+		}
+
+		srcs, err := g.GetSources()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		ret_src := []*Source{}
+		for _, src := range srcs {
+			ret_src = append(ret_src, convSource(src))
+		}
+		c.IndentedJSON(http.StatusOK, ret_src)
 	}
 }
 
-
-
 func getHandlerDeleteSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
+		var src Source
+		if err := c.ShouldBindJSON(&src); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		id, err := structs.ParseStringId(src.Id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := g.DeleteSource(id); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
 		c.JSON(http.StatusOK, gin.H{
-			"message": "hi",
+			"id": src.Id,
 		})
 	}
 }

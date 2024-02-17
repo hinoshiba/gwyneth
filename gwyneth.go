@@ -118,10 +118,3 @@ func (self *Gwyneth) FindSource(kw string) ([]*structs.Source, error) {
 func (self *Gwyneth) DeleteSource(id *structs.Id) error {
 	return self.tv.DeleteSource(id)
 }
-
-/*
-	GetSource(*structs.Id) (*structs.Source, error)
-	GetSources() ([]*structs.Source, error)
-	FindSource(string) ([]*structs.Source, error)
-	DeleteSource(*structs.Id) error
-*/

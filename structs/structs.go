@@ -122,7 +122,56 @@ func (self *Source) Value() string {
 	return self.val
 }
 
-type Article struct {}
+type Article struct {
+	id    *Id
+	src   *Source
+	title string
+	body  string
+	link  string
+	utime uint64
+	raw   string
+}
+
+func NewArticle(id *Id, src *Source, title string, body string, link string, utime uint64, raw string) {
+	return &Article{
+		id: id,
+		src: src,
+		title: title,
+		body: body,
+		link: link,
+		utime: utime,
+		raw: raw,
+	}
+}
+
+func (self *Article) Id() *Id {
+	return self.id
+}
+
+func (self *Article) Src() *Source {
+	return self.src
+}
+
+func (self *Article) Title() string {
+	return self.title
+}
+
+func (self *Article) Body() string {
+	return self.body
+}
+
+func (self *Article) Link() string {
+	return self.link
+}
+
+func (self *Article) utime() uint64 {
+	return self.utime
+}
+
+func (self *Article) Raw() string {
+	return self.raw
+}
+
 type Noticer struct {}
 type FilterAction struct {}
 type Filter struct {}
