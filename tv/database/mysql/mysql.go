@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+	"strings"
 	"database/sql"
 )
 
@@ -281,12 +282,7 @@ func (self *Session) AddSource(title string, src_type_id *structs.Id, source str
 		return nil, err
 	}
 
-	src_type, err := self.getSourceType(src_type_id)
-	if err != nil {
-		return nil, err
-	}
-
-	return structs.NewSource(id, title, src_type, source), nil
+	return self.getSource(id)
 }
 
 func (self *Session) GetSources() ([]*structs.Source, error) {
@@ -431,34 +427,144 @@ func (self *Session) DeleteSource(id *structs.Id) error {
 	return err
 }
 
-func (self *Session) AddArticle(title string, body string, link string, timestamp uint64, raw string, src_id *structs.Id) (*structs.Article, error){
-//too: WIP
+func (self *Session) getArticle(id *structs.Id) (*structs.Article, error) {
+	rows, err := self.db.Query("SELECT * FROM article WHERE id = ? AND disable = 1", id.Value())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var id_base []byte
+	var src_id_base []byte
+	var title string
+	var body string
+	var link string
+	var unixtime int64
+	var raw string
+
+	for rows.Next() {
+		if err = rows.Scan(&id_base, &src_id_base, &title, &body, &link, &unixtime, &raw); err != nil {
+			return nil, err
+		}
+		id = structs.NewId(id_base)
+		src_id := structs.NewId(src_id_base)
+
+		src, err := self.getSource(src_id)
+		if err != nil {
+			return nil, err
+		}
+
+		if err = rows.Err(); err != nil {
+			return nil, err
+		}
+		return structs.NewArticle(id, src, title, body, link, unixtime, raw), nil
+	}
+	return nil, fmt.Errorf("cannot find the article.")
 }
 
-func (self *Session) LookupArticles(kw string, src_ids []*structs.Id, start uint64, end uint64, limit int64) ([]*structs.Article, error) {
+func (self *Session) AddArticle(title string, body string, link string, unixtime int64, raw string, src_id *structs.Id) (*structs.Article, error){
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	id := structs.NewId(nil)
+
+	_, err := self.db.ExecContext(self.msn.AsContext(),
+		"INSERT INTO article (id, src_id, title, body, link, timestamp, raw) VALUES (?, ?, ?, ?, ?, ?, ?)",
+					id.Value(), src_id.Value(), title, body, link, unixtime, raw)
+	if err != nil {
+		return nil, err
+	}
+
+	return self.getArticle(id)
+}
+
+func (self *Session) LookupArticles(t_kw string, b_kw string, src_ids []*structs.Id, start int64, end int64, limit int64) ([]*structs.Article, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	q := "SELECT * FROM article WHERE disable <> 1"
+	args := make([]any, 0)
+	if t_kw != "" {
+		q += " AND LIKE ?"
+		args = append(args, "%" + t_kw + "%")
+	}
+	if b_kw != "" {
+		q += " AND LIKE ?"
+		args = append(args, "%" + b_kw + "%")
+	}
+	if start > 0 {
+		q += " AND timestamp >= ?"
+		args = append(args, start)
+	}
+	if end > 0 {
+		q += " AND timestamp <= ?"
+		args = append(args, end)
+	}
+	if len(src_ids) > 0 {
+		q += " AND src_id IN (?" + strings.Repeat(", ?", len(src_ids) - 1) + ")"
+		for _, src_id := range src_ids {
+			args = append(args, src_id)
+		}
+	}
+	if limit > 0 {
+		q += " LIMIT ?"
+		args = append(args, limit)
+	}
+
+	rows, err := self.db.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	articles := []*structs.Article{}
+	src_cache := make(map[string]*structs.Source)
+	for rows.Next() {
+		var id_base []byte
+		var src_id_base []byte
+		var title string
+		var body string
+		var link string
+		var unixtime int64
+		var raw string
+
+		if err = rows.Scan(&id_base, &src_id_base, &title, &body, &link, &unixtime, &raw); err != nil {
+			return nil, err
+		}
+		id := structs.NewId(id_base)
+		src_id := structs.NewId(src_id_base)
+
+		src, ok := src_cache[src_id.String()]
+		if !ok {
+			var err error
+			src, err := self.getSource(src_id)
+			if err != nil {
+				return nil, err
+			}
+
+			src_cache[src_id.String()] = src
+		}
+
+		if err = rows.Err(); err != nil {
+			return nil, err
+		}
+		articles = append(articles, structs.NewArticle(id, src, title, body, link, unixtime, raw))
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return articles, nil
 }
 
 func (self *Session) RemoveArticle(id *structs.Id) error {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	if _, err := self.getArticle(id); err != nil {
+		return err
+	}
+	_, err := self.db.ExecContext(self.msn.AsContext(),
+		"UPDATE tablename SET disable = 1 WHERE id = ?", id.Value())
+	return err
 }
-/*
-	AddArticle()
-	BatchAddArticle()
-	LookupArticles()
-	RemoveArticle()
-	AddArticle(string, string, string, uint64, string, *structs.Source) (*structs.Article, error)
-	//BatchAddArticle()
-	LookupArticles(string)
-	RemoveArticle(*structs.Id) error
-
-id BINARY(16) NOT NULL,
-src_id BINARY(16) NOT NULL,
-title LONGTEXT NOT NULL,
-body LONGTEXT NOT NULL,
-link TEXT NOT NULL,
-timestap TIMESTAMP NOT NULL,
-raw LONGTEXT NOT NULL,
-disable BOOLEAN NOT NULL DEFAULT 0,
-PRIMARY KEY (id),
-FOREIGN KEY (src_id) REFERENCES source(id)
-
-	*/

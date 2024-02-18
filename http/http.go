@@ -80,6 +80,12 @@ func (self *Router) map_route(g *gwyneth.Gwyneth) error {
 	self.engine.GET("/api/source", getHandlerGetSource(g))
 	self.engine.POST("/api/source", getHandlerAddSource(g))
 	self.engine.DELETE("/api/source", getHandlerDeleteSource(g))
+
+/*WIP
+	self.engine.GET("/api/article", getHandlerGetArticle(g))
+	self.engine.POST("/api/article", getHandlerAddArticle(g))
+	self.engine.DELETE("/api/article", getHandlerDeleteArticle(g))
+	*/
 	return nil
 
 }

@@ -32,16 +32,10 @@ type Session interface {
 	FindSource(string) ([]*structs.Source, error)
 	DeleteSource(*structs.Id) error
 
-	AddArticle(string, string, string, uint64, string, *structs.Source) (*structs.Article, error)
-	//BatchAddArticle()
-	LookupArticles(string)
+	AddArticle(string, string, string, int64, string, *structs.Id) (*structs.Article, error)
+	LookupArticles(string, string, []*structs.Id, int64, int64, int64) ([]*structs.Article, error)
 	RemoveArticle(*structs.Id) error
 	/*
-	AddArticle()
-	BatchAddArticle()
-	LookupArticles()
-	RemoveArticle()
-
 	AddNoticer()
 	GetNoticers()
 	DeleteNoticer()

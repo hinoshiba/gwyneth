@@ -128,11 +128,11 @@ type Article struct {
 	title string
 	body  string
 	link  string
-	utime uint64
+	utime int64
 	raw   string
 }
 
-func NewArticle(id *Id, src *Source, title string, body string, link string, utime uint64, raw string) {
+func NewArticle(id *Id, src *Source, title string, body string, link string, utime int64, raw string) *Article {
 	return &Article{
 		id: id,
 		src: src,
@@ -164,7 +164,7 @@ func (self *Article) Link() string {
 	return self.link
 }
 
-func (self *Article) utime() uint64 {
+func (self *Article) Unixtime() int64 {
 	return self.utime
 }
 
