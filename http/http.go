@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"strconv"
 )
 
 import (
@@ -81,11 +82,11 @@ func (self *Router) map_route(g *gwyneth.Gwyneth) error {
 	self.engine.POST("/api/source", getHandlerAddSource(g))
 	self.engine.DELETE("/api/source", getHandlerDeleteSource(g))
 
-/*WIP
-	self.engine.GET("/api/article", getHandlerGetArticle(g))
+	self.engine.GET("/api/article", getHandlerLookupArticles(g))
 	self.engine.POST("/api/article", getHandlerAddArticle(g))
-	self.engine.DELETE("/api/article", getHandlerDeleteArticle(g))
-	*/
+	self.engine.DELETE("/api/article", getHandlerRemoveArticle(g))
+
+	self.engine.GET("/api/feed", getHandlerGetFeed(g))
 	return nil
 
 }
@@ -265,5 +266,128 @@ func getHandlerDeleteSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"id": src.Id,
 		})
+	}
+}
+
+func getHandlerAddArticle(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		var article Article
+		if err := c.ShouldBindJSON(&article); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		slog.Debug(fmt.Sprintf("request is '%v'", article))
+
+		src_id, err := structs.ParseStringId(article.Src.Id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("cannot parse src id('%s'): %s", article.Src.Id, err)})
+			return
+		}
+
+		added_article, err := g.AddArticle(article.Title, article.Body, article.Link, int64(article.Timestamp), article.Raw, src_id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.IndentedJSON(http.StatusOK, convArticle(added_article))
+	}
+}
+
+func getHandlerRemoveArticle(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		var article Article
+		if err := c.ShouldBindJSON(&article); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		id, err := structs.ParseStringId(article.Id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := g.RemoveArticle(id); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"id": article.Id,
+		})
+	}
+}
+
+func getHandlerLookupArticles(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		title := c.Query("title")
+		body := c.Query("body")
+		s_start := c.DefaultQuery("start", "-1")
+		s_end := c.DefaultQuery("end", "-1")
+		s_limit := c.DefaultQuery("limit", "-1")
+
+		start, err := strconv.ParseInt(s_start, 10, 64)
+		if err != nil {
+			err_msg := fmt.Sprintf("unkown fmt the parameter of start('%s'): %s", s_start, err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err_msg})
+			return
+		}
+		end, err := strconv.ParseInt(s_end, 10, 64)
+		if err != nil {
+			err_msg := fmt.Sprintf("unkown fmt the parameter of end('%s'): %s", s_end, err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err_msg})
+			return
+		}
+		limit, err := strconv.ParseInt(s_limit, 10, 64)
+		if err != nil {
+			err_msg := fmt.Sprintf("unkown fmt the parameter of limit('%s'): %s", s_limit, err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err_msg})
+			return
+		}
+
+		as, err := g.LookupArticles(title, body, nil, start, end, limit)
+		if err != nil {
+			err_msg := fmt.Sprintf("lookup failed: %s", err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err_msg})
+			return
+		}
+
+		ret_as := make([]*Article, len(as), len(as))
+		for i, article := range as {
+			ret_as[i] = convArticle(article)
+		}
+		c.IndentedJSON(http.StatusOK, ret_as)
+	}
+}
+
+func getHandlerGetFeed(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		src_id_base := c.Query("src_id")
+		s_limit := c.DefaultQuery("limit", "30")
+
+		src_id, err := structs.ParseStringId(src_id_base)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("cannot parse src id('%s'): %s", src_id_base, err)})
+			return
+		}
+		limit, err := strconv.ParseInt(s_limit, 10, 64)
+		if err != nil {
+			err_msg := fmt.Sprintf("unkown fmt the parameter of limit('%s'): %s", s_limit, err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err_msg})
+			return
+		}
+
+		as, err := g.GetFeed(src_id, limit)
+		if err != nil {
+			err_msg := fmt.Sprintf("get failed: %s", err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err_msg})
+			return
+		}
+
+		ret_as := make([]*Article, len(as), len(as))
+		for i, article := range as {
+			ret_as[i] = convArticle(article)
+		}
+		c.IndentedJSON(http.StatusOK, ret_as)
 	}
 }

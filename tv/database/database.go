@@ -35,6 +35,10 @@ type Session interface {
 	AddArticle(string, string, string, int64, string, *structs.Id) (*structs.Article, error)
 	LookupArticles(string, string, []*structs.Id, int64, int64, int64) ([]*structs.Article, error)
 	RemoveArticle(*structs.Id) error
+
+	GetFeed(*structs.Id, int64) ([]*structs.Article, error)
+	RemoveFeedEntry(*structs.Id, *structs.Id) error
+
 	/*
 	AddNoticer()
 	GetNoticers()

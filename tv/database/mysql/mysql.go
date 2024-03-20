@@ -428,38 +428,11 @@ func (self *Session) DeleteSource(id *structs.Id) error {
 }
 
 func (self *Session) getArticle(id *structs.Id) (*structs.Article, error) {
-	rows, err := self.db.Query("SELECT * FROM article WHERE id = ? AND disable = 1", id.Value())
+	as, err := self.query4article("SELECT id, src_id, title, body, link, timestamp, raw FROM article WHERE id = ? AND disable <> 1", id.Value())
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var id_base []byte
-	var src_id_base []byte
-	var title string
-	var body string
-	var link string
-	var unixtime int64
-	var raw string
-
-	for rows.Next() {
-		if err = rows.Scan(&id_base, &src_id_base, &title, &body, &link, &unixtime, &raw); err != nil {
-			return nil, err
-		}
-		id = structs.NewId(id_base)
-		src_id := structs.NewId(src_id_base)
-
-		src, err := self.getSource(src_id)
-		if err != nil {
-			return nil, err
-		}
-
-		if err = rows.Err(); err != nil {
-			return nil, err
-		}
-		return structs.NewArticle(id, src, title, body, link, unixtime, raw), nil
-	}
-	return nil, fmt.Errorf("cannot find the article.")
+	return as[0], nil
 }
 
 func (self *Session) AddArticle(title string, body string, link string, unixtime int64, raw string, src_id *structs.Id) (*structs.Article, error){
@@ -469,9 +442,12 @@ func (self *Session) AddArticle(title string, body string, link string, unixtime
 	id := structs.NewId(nil)
 
 	_, err := self.db.ExecContext(self.msn.AsContext(),
-		"INSERT INTO article (id, src_id, title, body, link, timestamp, raw) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		"INSERT INTO article (id, src_id, title, body, link, timestamp, raw) VALUES (?, ?, ?, ?, ?, FROM_UNIXTIME(?), ?)",
 					id.Value(), src_id.Value(), title, body, link, unixtime, raw)
 	if err != nil {
+		return nil, err
+	}
+	if err := self.addFeed(src_id, id); err != nil {
 		return nil, err
 	}
 
@@ -482,7 +458,7 @@ func (self *Session) LookupArticles(t_kw string, b_kw string, src_ids []*structs
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
-	q := "SELECT * FROM article WHERE disable <> 1"
+	q := "SELECT id, src_id, title, body, link, timestamp, raw FROM article WHERE disable <> 1"
 	args := make([]any, 0)
 	if t_kw != "" {
 		q += " AND LIKE ?"
@@ -511,6 +487,58 @@ func (self *Session) LookupArticles(t_kw string, b_kw string, src_ids []*structs
 		args = append(args, limit)
 	}
 
+	return self.query4article(q, args...)
+}
+
+func (self *Session) RemoveArticle(id *structs.Id) error {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	if _, err := self.getArticle(id); err != nil {
+		return err
+	}
+	_, err := self.db.ExecContext(self.msn.AsContext(),
+		"UPDATE article SET disable = 1 WHERE id = ?", id.Value())
+	return err
+}
+
+func (self *Session) GetFeed(src_id *structs.Id, limit int64) ([]*structs.Article, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	if limit <= 0 {
+		limit = 100
+	}
+
+	var q string = `
+SELECT a.id, a.src_id, a.title, a.body, a.link, a.timestamp, a.raw
+FROM article a
+JOIN feed f ON a.id = f.article_id
+WHERE f.src_id = ? AND a.disable <> 1
+ORDER BY f.timestamp DESC
+LIMIT ?
+`
+
+	return self.query4article(q, src_id.Value(), limit)
+}
+
+func (self *Session) RemoveFeedEntry(src_id *structs.Id, article_id *structs.Id) error {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	_, err := self.db.ExecContext(self.msn.AsContext(),
+		"UPDATE feed SET disable = 1 WHERE src_id = ? AND article_id = ?", src_id.Value(), article_id.Value())
+	return err
+}
+
+func (self *Session) addFeed(src_id *structs.Id, article_id *structs.Id) error {
+	_, err := self.db.ExecContext(self.msn.AsContext(),
+					"INSERT INTO feed (src_id, article_id) VALUES (?, ?)",
+											src_id.Value(), article_id.Value())
+	return err
+}
+
+func (self *Session) query4article(q string, args ...any) ([]*structs.Article, error) {
 	rows, err := self.db.Query(q, args...)
 	if err != nil {
 		return nil, err
@@ -525,10 +553,10 @@ func (self *Session) LookupArticles(t_kw string, b_kw string, src_ids []*structs
 		var title string
 		var body string
 		var link string
-		var unixtime int64
+		var t_stamp time.Time
 		var raw string
 
-		if err = rows.Scan(&id_base, &src_id_base, &title, &body, &link, &unixtime, &raw); err != nil {
+		if err = rows.Scan(&id_base, &src_id_base, &title, &body, &link, &t_stamp, &raw); err != nil {
 			return nil, err
 		}
 		id := structs.NewId(id_base)
@@ -537,7 +565,7 @@ func (self *Session) LookupArticles(t_kw string, b_kw string, src_ids []*structs
 		src, ok := src_cache[src_id.String()]
 		if !ok {
 			var err error
-			src, err := self.getSource(src_id)
+			src, err = self.getSource(src_id)
 			if err != nil {
 				return nil, err
 			}
@@ -548,23 +576,11 @@ func (self *Session) LookupArticles(t_kw string, b_kw string, src_ids []*structs
 		if err = rows.Err(); err != nil {
 			return nil, err
 		}
-		articles = append(articles, structs.NewArticle(id, src, title, body, link, unixtime, raw))
+		articles = append(articles, structs.NewArticle(id, src, title, body, link, t_stamp.Unix(), raw))
 	}
 
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return articles, nil
-}
-
-func (self *Session) RemoveArticle(id *structs.Id) error {
-	self.mtx.Lock()
-	defer self.mtx.Unlock()
-
-	if _, err := self.getArticle(id); err != nil {
-		return err
-	}
-	_, err := self.db.ExecContext(self.msn.AsContext(),
-		"UPDATE tablename SET disable = 1 WHERE id = ?", id.Value())
-	return err
 }

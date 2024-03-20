@@ -118,3 +118,43 @@ func (self *Gwyneth) FindSource(kw string) ([]*structs.Source, error) {
 func (self *Gwyneth) DeleteSource(id *structs.Id) error {
 	return self.tv.DeleteSource(id)
 }
+
+func (self *Gwyneth) AddArticle(title string, body string, link string, utime int64, raw string, src_id *structs.Id) (*structs.Article, error){
+	return self.addArticle(title, body, link, utime, raw, src_id)
+}
+
+func (self *Gwyneth) addArticle(title string, body string, link string, utime int64, raw string, src_id *structs.Id) (*structs.Article, error){
+	return self.tv.AddArticle(title, body, link, utime, raw, src_id)
+}
+
+func (self *Gwyneth) RemoveArticle(id *structs.Id) error {
+	return self.removeArticle(id)
+}
+
+func (self *Gwyneth) removeArticle(id *structs.Id) error {
+	return self.tv.RemoveArticle(id)
+}
+
+func (self *Gwyneth) LookupArticles(t_kw string, b_kw string, src_ids []*structs.Id, start int64, end int64, limit int64) ([]*structs.Article, error) {
+	return self.lookupArticles(t_kw, b_kw, src_ids, start, end, limit)
+}
+
+func (self *Gwyneth) lookupArticles(t_kw string, b_kw string, src_ids []*structs.Id, start int64, end int64, limit int64) ([]*structs.Article, error) {
+	return self.tv.LookupArticles(t_kw, b_kw, src_ids, start, end, limit)
+}
+
+func (self *Gwyneth) GetFeed(src_id *structs.Id, limit int64) ([]*structs.Article, error) {
+	return self.getFeed(src_id, limit)
+}
+
+func (self *Gwyneth) getFeed(src_id *structs.Id, limit int64) ([]*structs.Article, error) {
+	return self.tv.GetFeed(src_id, limit)
+}
+
+func (self *Gwyneth) RemoveFeedEntry(src_id *structs.Id, article_id *structs.Id) error {
+	return self.removeFeedEntry(src_id, article_id)
+}
+
+func (self *Gwyneth) removeFeedEntry(src_id *structs.Id, article_id *structs.Id) error {
+	return self.tv.RemoveFeedEntry(src_id, article_id)
+}

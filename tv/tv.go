@@ -145,3 +145,38 @@ func (self *TimeVortex) DeleteSource(id *structs.Id) error {
 func (self *TimeVortex) deleteSource(id *structs.Id) error {
 	return self.db.DeleteSource(id)
 }
+
+func (self *TimeVortex) AddArticle(title string, body string, link string, utime int64, raw string, src_id *structs.Id) (*structs.Article, error){
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	return self.db.AddArticle(title, body, link, utime, raw, src_id)
+}
+
+func (self *TimeVortex) RemoveArticle(id *structs.Id) error {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	return self.db.RemoveArticle(id)
+}
+
+func (self *TimeVortex) LookupArticles(t_kw string, b_kw string, src_ids []*structs.Id, start int64, end int64, limit int64) ([]*structs.Article, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	return self.db.LookupArticles(t_kw, b_kw, src_ids, start, end, limit)
+}
+
+func (self *TimeVortex) GetFeed(src_id *structs.Id, limit int64) ([]*structs.Article, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	return self.db.GetFeed(src_id, limit)
+}
+
+func (self *TimeVortex) RemoveFeedEntry(src_id *structs.Id, article_id *structs.Id) error {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	return self.db.RemoveFeedEntry(src_id, article_id)
+}
