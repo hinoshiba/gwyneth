@@ -506,6 +506,10 @@ func (self *Session) GetFeed(src_id *structs.Id, limit int64) ([]*structs.Articl
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
+	if _, err := self.getSource(src_id); err != nil {
+		return nil, err
+	}
+
 	if limit <= 0 {
 		limit = 100
 	}

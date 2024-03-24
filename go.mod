@@ -6,6 +6,7 @@ require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-sql-driver/mysql v1.7.1
 	github.com/google/uuid v1.6.0
+	github.com/gorilla/feeds v1.1.2
 	github.com/l4go/task v1.20220225.0
 	gopkg.in/yaml.v2 v2.4.0
 )

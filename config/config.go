@@ -35,6 +35,7 @@ func Load(path string) (*Config, error) {
 type Config struct {
 	Database *Database `yaml:"database"`
 	Http     *Http     `yaml:"http"`
+	Feed     *Feed     `yaml:"feed"`
 }
 
 func (self *Config) check() error {
@@ -42,6 +43,9 @@ func (self *Config) check() error {
 		return err
 	}
 	if err := self.Http.check(); err != nil {
+		return err
+	}
+	if err := self.Feed.check(); err != nil {
 		return err
 	}
 	return nil
@@ -88,4 +92,27 @@ func (self *Http) check() error {
 
 func (self *Http) GetAddr() string {
 	return fmt.Sprintf("%s:%d", self.Host, self.Port)
+}
+
+type Feed struct {
+	Title       string `yaml:"title"`
+	Description string `yaml:"description"`
+	Link        string `yaml:"link"`
+	AuthorName  string `yaml:"author_name"`
+	AuthorEmail string `yaml:"author_email"`
+
+	DefaultType string `yaml:"default_type"`
+}
+
+func (self *Feed) check() error {
+	if self.DefaultType == "rss" {
+		return nil
+	}
+	if self.DefaultType == "atom" {
+		return nil
+	}
+	if self.DefaultType == "json" {
+		return nil
+	}
+	return fmt.Errorf("Feed.Default: unsupported type: %s", self.DefaultType)
 }

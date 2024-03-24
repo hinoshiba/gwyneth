@@ -15,6 +15,7 @@ import (
 
 import (
 	"github.com/hinoshiba/gwyneth"
+	"github.com/hinoshiba/gwyneth/consts"
 	"github.com/hinoshiba/gwyneth/config"
 	"github.com/hinoshiba/gwyneth/structs"
 )
@@ -26,19 +27,19 @@ func init() {
 type Router struct {
 	engine *gin.Engine
 
-	cfg    *config.Http
+	cfg    *config.Config
 
 	msn    *task.Mission
 }
 
-func New(msn *task.Mission, cfg *config.Http, g *gwyneth.Gwyneth) (*Router, error) {
+func New(msn *task.Mission, cfg *config.Config, g *gwyneth.Gwyneth) (*Router, error) {
 	self := &Router{
 		engine: gin.Default(),
 		cfg: cfg,
 		msn: msn,
 	}
 
-	self.map_route(g)
+	self.mapRoute(g)
 	if err := self.run(); err != nil {
 		self.Close()
 		return nil, err
@@ -53,12 +54,12 @@ func (self *Router) Close() error {
 	return nil
 }
 
-func (self *Router) map_route(g *gwyneth.Gwyneth) error {
+func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
 	self.engine.LoadHTMLGlob("/usr/local/src/http/templates/*")
 	self.engine.Static("/static", "/usr/local/src/http/static")
 	self.engine.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index.html", gin.H{
-		 "message": "Hi, i'm gwyneth.",
+		 "message": fmt.Sprintf("Welcome to Gwyneth %s", consts.VERSION),
 		})
 	})
 	self.engine.GET("/source_type", func(c *gin.Context) {
@@ -82,20 +83,19 @@ func (self *Router) map_route(g *gwyneth.Gwyneth) error {
 	self.engine.POST("/api/source", getHandlerAddSource(g))
 	self.engine.DELETE("/api/source", getHandlerDeleteSource(g))
 
-	self.engine.GET("/api/article", getHandlerLookupArticles(g))
+	self.engine.GET("/api/article", getHandlerLookupArticles(self.cfg.Feed, g))
 	self.engine.POST("/api/article", getHandlerAddArticle(g))
 	self.engine.DELETE("/api/article", getHandlerRemoveArticle(g))
 
-	self.engine.GET("/api/feed", getHandlerGetFeed(g))
+	self.engine.GET("/api/feed", getHandlerGetFeed(self.cfg.Feed, g))
 	return nil
-
 }
 
 func (self *Router) run() error {
 	c_msn := self.msn.New()
 
 	lc := net.ListenConfig{}
-	ln, err := lc.Listen(c_msn.AsContext(), "tcp", self.cfg.GetAddr())
+	ln, err := lc.Listen(c_msn.AsContext(), "tcp", self.cfg.Http.GetAddr())
 	if err != nil {
 		return err
 	}
@@ -318,13 +318,14 @@ func getHandlerRemoveArticle(g *gwyneth.Gwyneth) func(*gin.Context) {
 	}
 }
 
-func getHandlerLookupArticles(g *gwyneth.Gwyneth) func(*gin.Context) {
+func getHandlerLookupArticles(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
 		title := c.Query("title")
 		body := c.Query("body")
 		s_start := c.DefaultQuery("start", "-1")
 		s_end := c.DefaultQuery("end", "-1")
 		s_limit := c.DefaultQuery("limit", "-1")
+		feed_type := c.DefaultQuery("type", cfg.DefaultType)
 
 		start, err := strconv.ParseInt(s_start, 10, 64)
 		if err != nil {
@@ -352,18 +353,15 @@ func getHandlerLookupArticles(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		ret_as := make([]*Article, len(as), len(as))
-		for i, article := range as {
-			ret_as[i] = convArticle(article)
-		}
-		c.IndentedJSON(http.StatusOK, ret_as)
+		doResponseFeed(cfg, c, as, feed_type)
 	}
 }
 
-func getHandlerGetFeed(g *gwyneth.Gwyneth) func(*gin.Context) {
+func getHandlerGetFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
 		src_id_base := c.Query("src_id")
 		s_limit := c.DefaultQuery("limit", "30")
+		feed_type := c.DefaultQuery("type", cfg.DefaultType)
 
 		src_id, err := structs.ParseStringId(src_id_base)
 		if err != nil {
@@ -384,10 +382,51 @@ func getHandlerGetFeed(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		ret_as := make([]*Article, len(as), len(as))
-		for i, article := range as {
-			ret_as[i] = convArticle(article)
-		}
-		c.IndentedJSON(http.StatusOK, ret_as)
+		doResponseFeed(cfg, c, as, feed_type)
 	}
+}
+
+func doResponseFeed(cfg *config.Feed, c *gin.Context, as []*structs.Article, feed_type string) {
+	f, err := makeFeed(cfg, as)
+	if err != nil {
+		err_msg := fmt.Sprintf("cannot make feed: %s", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err_msg})
+		return
+	}
+
+	switch feed_type {
+	case "rss":
+		rss_str, err := f.ToRss()
+		if err != nil {
+			err_msg := fmt.Sprintf("cannot make feed: %s", err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err_msg})
+			return
+		}
+		c.Data(http.StatusOK, "application/rss+xml", []byte(rss_str))
+		return
+
+	case "atom":
+		atom_str, err := f.ToAtom()
+		if err != nil {
+			err_msg := fmt.Sprintf("cannot make feed: %s", err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err_msg})
+			return
+		}
+		c.Data(http.StatusOK, "application/atom+xml", []byte(atom_str))
+		return
+
+	case "json":
+		j_str, err := f.ToJSON()
+		if err != nil {
+			err_msg := fmt.Sprintf("cannot make feed: %s", err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err_msg})
+			return
+		}
+		c.Data(http.StatusOK, "application/json", []byte(j_str))
+		return
+
+	}
+	err_msg := fmt.Sprintf("unsupported type: '%s'", feed_type)
+	c.JSON(http.StatusBadRequest, gin.H{"error": err_msg})
+	return
 }

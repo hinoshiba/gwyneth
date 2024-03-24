@@ -36,7 +36,7 @@ func gwyneth_cmd() error {
 	}
 	defer g.Close()
 
-	rt, err := http.New(msn.New(), Config.Http, g)
+	rt, err := http.New(msn.New(), Config, g)
 	if err != nil {
 		return err
 	}

@@ -74,7 +74,7 @@
                 data.forEach(source => {
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td>${source.id}</td>
+                        <td><a href="./api/feed?src_id=${source.id}" target="_blank" rel="noopener noreferrer">${source.id}</a></td>
                         <td>${source.title}</td>
                         <td>${source.value}</td>
                         <td>${source.type.name}</td>
