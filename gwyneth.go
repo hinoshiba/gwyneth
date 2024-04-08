@@ -133,11 +133,12 @@ func (self *Gwyneth) run_rss_collector(msn *task.Mission, artcl_ch chan <- *stru
 		slog.Info(fmt.Sprintf("rss collector is zero"))
 		return nil
 	}
-	tgts_s := split_src(60, tgts)
 
+	loop_sec := 10
+
+	tgts_s := split_src(loop_sec, tgts)
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
-
 	now := 0
 	for {
 		select {
@@ -145,7 +146,12 @@ func (self *Gwyneth) run_rss_collector(msn *task.Mission, artcl_ch chan <- *stru
 			return nil
 		case <- ticker.C:
 			func () {
-				defer func(){now++}()
+				defer func(){
+					now++
+					if now >= loop_sec {
+						now = 0
+					}
+				}()
 
 				if len(tgts_s) <= now {
 					return

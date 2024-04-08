@@ -439,9 +439,17 @@ func (self *Session) AddArticle(title string, body string, link string, unixtime
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
-	id := structs.NewId(nil)
+	q := "SELECT id, src_id, title, body, link, timestamp, raw FROM article WHERE title = ? AND body = ? AND link = ? AND src_id = ?"
+	as, err := self.query4article(q, title, body, link, src_id.Value())
+	if err != nil {
+		return nil, err
+	}
+	if !(len(as) < 1) {
+		return as[0], nil
+	}
 
-	_, err := self.db.ExecContext(self.msn.AsContext(),
+	id := structs.NewId(nil)
+	_, err = self.db.ExecContext(self.msn.AsContext(),
 		"INSERT INTO article (id, src_id, title, body, link, timestamp, raw) VALUES (?, ?, ?, ?, ?, FROM_UNIXTIME(?), ?)",
 					id.Value(), src_id.Value(), title, body, link, unixtime, raw)
 	if err != nil {
