@@ -134,7 +134,7 @@ func (self *Gwyneth) run_rss_collector(msn *task.Mission, artcl_ch chan <- *stru
 		return nil
 	}
 
-	loop_sec := 10
+	loop_sec := 60 * 5 //WIP: to config
 
 	tgts_s := split_src(loop_sec, tgts)
 	ticker := time.NewTicker(1 * time.Second)
