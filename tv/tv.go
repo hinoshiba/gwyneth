@@ -180,3 +180,66 @@ func (self *TimeVortex) RemoveFeedEntry(src_id *structs.Id, article_id *structs.
 
 	return self.db.RemoveFeedEntry(src_id, article_id)
 }
+
+func (self *TimeVortex) AddAction(name string, cmd string) (*structs.Action, error) {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	return self.db.AddAction(name, cmd)
+}
+
+func (self *TimeVortex) GetAction(id *structs.Id) (*structs.Action, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	return self.db.GetAction(id)
+}
+
+func (self *TimeVortex) GetActions() ([]*structs.Action, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	return self.db.GetActions()
+}
+
+func (self *TimeVortex) DeleteAction(id *structs.Id) error {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	return self.db.DeleteAction(id)
+}
+
+func (self *TimeVortex) AddFilter(title string, regex_title bool, body string, regex_body bool, action_id *structs.Id) (*structs.Filter, error) {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	return self.db.AddFilter(title, regex_title, body, regex_body, action_id)
+}
+
+func (self *TimeVortex) UpdateFilterAction(id *structs.Id, action_id *structs.Id) (*structs.Filter, error) {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	return self.db.UpdateFilterAction(id, action_id)
+}
+
+func (self *TimeVortex) GetFilter(id *structs.Id) (*structs.Filter, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	return self.db.GetFilter(id)
+}
+
+func (self *TimeVortex) GetFilters() ([]*structs.Filter, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	return self.db.GetFilters()
+}
+
+func (self *TimeVortex) DeleteFilter(id *structs.Id) error {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	return self.db.DeleteFilter(id)
+}

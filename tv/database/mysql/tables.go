@@ -19,7 +19,7 @@ func make_table_dict() ([]string, map[string]string) {
 
 const TABLE_ACTION string = `
 id BINARY(16) NOT NULL,
-name TEXT NOT NULL,
+name VARCHAR(255) UNIQUE NOT NULL,
 command TEXT,
 PRIMARY KEY (id)
 `
@@ -38,7 +38,7 @@ FOREIGN KEY (action_id) REFERENCES action(id)
 
 const TABLE_SOURCE_TYPE string = `
 id BINARY(16) NOT NULL,
-name TEXT NOT NULL,
+name VARCHAR(255) NOT NULL,
 command TEXT,
 user_create BOOLEAN NOT NULL DEFAULT 1,
 PRIMARY KEY (id)
@@ -47,7 +47,7 @@ PRIMARY KEY (id)
 
 const TABLE_SOURCE string = `
 id BINARY(16) NOT NULL,
-title TEXT NOT NULL,
+title VARCHAR(255) NOT NULL,
 type BINARY(16) NOT NULL,
 source TEXT NOT NULL,
 PRIMARY KEY (id),

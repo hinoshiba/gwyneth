@@ -278,6 +278,62 @@ func (self *Gwyneth) removeFeedEntry(src_id *structs.Id, article_id *structs.Id)
 	return self.tv.RemoveFeedEntry(src_id, article_id)
 }
 
+func (self *Gwyneth) AddAction(name string, cmd string) (*structs.Action, error) {
+	return self.addAction(name, cmd)
+}
+
+func (self *Gwyneth) addAction(name string, cmd string) (*structs.Action, error) {
+	return self.tv.AddAction(name, cmd)
+}
+
+func (self *Gwyneth) GetActions() ([]*structs.Action, error) {
+	return self.getActions()
+}
+
+func (self *Gwyneth) getActions() ([]*structs.Action, error) {
+	return self.tv.GetActions()
+}
+
+func (self *Gwyneth) DeleteAction(id *structs.Id) error {
+	return self.deleteAction(id)
+}
+
+func (self *Gwyneth) deleteAction(id *structs.Id) error {
+	return self.tv.DeleteAction(id)
+}
+
+func (self *Gwyneth) AddFilter(title string, regex_title bool, body string, regex_body bool, action_id *structs.Id) (*structs.Filter, error) {
+	return self.addFilter(title, regex_title, body, regex_body, action_id)
+}
+
+func (self *Gwyneth) addFilter(title string, regex_title bool, body string, regex_body bool, action_id *structs.Id) (*structs.Filter, error) {
+	return self.tv.AddFilter(title, regex_title, body, regex_body, action_id)
+}
+
+func (self *Gwyneth) UpdateFilterAction(id *structs.Id, action_id *structs.Id) (*structs.Filter, error) {
+	return self.updateFilterAction(id, action_id)
+}
+
+func (self *Gwyneth) updateFilterAction(id *structs.Id, action_id *structs.Id) (*structs.Filter, error) {
+	return self.tv.UpdateFilterAction(id, action_id)
+}
+
+func (self *Gwyneth) GetFilters() ([]*structs.Filter, error) {
+	return self.getFilters()
+}
+
+func (self *Gwyneth) getFilters() ([]*structs.Filter, error) {
+	return self.tv.GetFilters()
+}
+
+func (self *Gwyneth) DeleteFilter(id *structs.Id) error {
+	return self.deleteFilter(id)
+}
+
+func (self *Gwyneth) deleteFilter(id *structs.Id) error {
+	return self.tv.DeleteFilter(id)
+}
+
 func rss_collector(msn *task.Mission, args ...any) {
 	defer msn.Done()
 
