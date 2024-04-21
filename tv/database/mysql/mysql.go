@@ -230,7 +230,7 @@ func (self *Session) GetSourceType(id *structs.Id) (*structs.SourceType, error) 
 }
 
 func (self *Session) getSourceType(id *structs.Id) (*structs.SourceType, error) {
-	rows, err := self.db.Query("SELECT * FROM source_type WHERE id = ?", id.Value())
+	rows, err := self.db.Query("SELECT * FROM source_type WHERE id = ? LIMIT 1", id.Value())
 	if err != nil {
 		return nil, err
 	}
@@ -383,7 +383,7 @@ func (self *Session) GetSource(id *structs.Id) (*structs.Source, error) {
 }
 
 func (self *Session) getSource(id *structs.Id) (*structs.Source, error) {
-	rows, err := self.db.Query("SELECT * FROM source WHERE id = ?", id.Value())
+	rows, err := self.db.Query("SELECT * FROM source WHERE id = ? LIMIT 1", id.Value())
 	if err != nil {
 		return nil, err
 	}
@@ -428,7 +428,7 @@ func (self *Session) DeleteSource(id *structs.Id) error {
 }
 
 func (self *Session) getArticle(id *structs.Id) (*structs.Article, error) {
-	as, err := self.query4article("SELECT id, src_id, title, body, link, timestamp, raw FROM article WHERE id = ? AND disable <> 1", id.Value())
+	as, err := self.query4article("SELECT id, src_id, title, body, link, timestamp, raw FROM article WHERE id = ? AND disable <> 1 LIMIT 1", id.Value())
 	if err != nil {
 		return nil, err
 	}
@@ -523,7 +523,7 @@ func (self *Session) GetFeed(src_id *structs.Id, limit int64) ([]*structs.Articl
 	}
 
 	var q string = `
-SELECT a.id, a.src_id, a.title, a.body, a.link, a.timestamp, a.raw
+SELECT a.id, f.src_id, a.title, a.body, a.link, a.timestamp, a.raw
 FROM article a
 JOIN feed f ON a.id = f.article_id
 WHERE f.src_id = ? AND a.disable <> 1
@@ -541,6 +541,13 @@ func (self *Session) RemoveFeedEntry(src_id *structs.Id, article_id *structs.Id)
 	_, err := self.db.ExecContext(self.msn.AsContext(),
 		"UPDATE feed SET disable = 1 WHERE src_id = ? AND article_id = ?", src_id.Value(), article_id.Value())
 	return err
+}
+
+func (self *Session) BindFeed(src_id *structs.Id, article_id *structs.Id) error {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	return self.addFeed(src_id, article_id)
 }
 
 func (self *Session) addFeed(src_id *structs.Id, article_id *structs.Id) error {
@@ -595,4 +602,232 @@ func (self *Session) query4article(q string, args ...any) ([]*structs.Article, e
 		return nil, err
 	}
 	return articles, nil
+}
+
+func (self *Session) AddAction(name string, cmd string) (*structs.Action, error) {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	id := structs.NewId(nil)
+
+	_, err := self.db.ExecContext(self.msn.AsContext(),
+		"INSERT INTO action (id, name, command) VALUES (?, ?, ?)", id.Value(), name, cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	return structs.NewAction(id, name, cmd), nil
+}
+
+func (self *Session) GetActions() ([]*structs.Action, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	rows, err := self.db.Query("SELECT * FROM action")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	actions := []*structs.Action{}
+	for rows.Next() {
+		var id_base []byte
+		var name string
+		var cmd string
+
+		err := rows.Scan(&id_base, &name, &cmd)
+		if err != nil {
+			return nil, err
+		}
+		id := structs.NewId(id_base)
+		action := structs.NewAction(id, name, cmd)
+
+		actions = append(actions, action)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return actions, nil
+}
+
+func (self *Session) GetAction(id *structs.Id) (*structs.Action, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	return self.getAction(id)
+}
+
+func (self *Session) getAction(id *structs.Id) (*structs.Action, error) {
+	rows, err := self.db.Query("SELECT * FROM action WHERE id = ? LIMIT 1", id.Value())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var id_base []byte
+	var name string
+	var cmd string
+
+	for rows.Next() {
+		if err = rows.Scan(&id_base, &name, &cmd); err != nil {
+			return nil, err
+		}
+		id = structs.NewId(id_base)
+		action := structs.NewAction(id, name, cmd)
+
+		if err = rows.Err(); err != nil {
+			return nil, err
+		}
+		return action, nil
+	}
+	return nil, fmt.Errorf("cannot find the action")
+}
+
+func (self *Session) DeleteAction(id *structs.Id) error {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	if _, err := self.getAction(id); err != nil {
+		return err
+	}
+
+	_, err := self.db.ExecContext(self.msn.AsContext(),
+		"DELETE FROM action WHERE id = ?", id.Value())
+	return err
+}
+
+func (self *Session) AddFilter(title string, regex_title bool, body string, regex_body bool, action_id *structs.Id) (*structs.Filter, error) {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	id := structs.NewId(nil)
+
+	_, err := self.db.ExecContext(self.msn.AsContext(),
+		"INSERT INTO filter (id, val_title, is_regex_title, val_body, is_regex_body, action_id) VALUES (?, ?, ?, ?, ?, ?)",
+			id.Value(), title, regex_title, body, regex_body, action_id.Value())
+	if err != nil {
+		return nil, err
+	}
+
+	return self.getFilter(id)
+}
+
+func (self *Session) UpdateFilterAction(id *structs.Id, action_id *structs.Id) (*structs.Filter, error) {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	if _, err := self.getFilter(id); err != nil {
+		return nil, err
+	}
+
+	_, err := self.db.ExecContext(self.msn.AsContext(),
+		"UPDATE filter SET action_id = ? WHERE id = ?", action_id.Value(), id.Value())
+	if err != nil {
+		return nil, err
+	}
+	return self.getFilter(id)
+}
+
+func (self *Session) GetFilter(id *structs.Id) (*structs.Filter, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	return self.getFilter(id)
+}
+
+func (self *Session) getFilter(id *structs.Id) (*structs.Filter, error) {
+	rows, err := self.db.Query("SELECT * FROM filter WHERE id = ? LIMIT 1", id.Value())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var id_base        []byte
+	var val_title      string
+	var is_regex_title bool
+	var val_body       string
+	var is_regex_body  bool
+	var action_id_base []byte
+	for rows.Next() {
+		err := rows.Scan(&id_base, &val_title, &is_regex_title, &val_body, &is_regex_body, &action_id_base)
+		if err != nil {
+			return nil, err
+		}
+		id := structs.NewId(id_base)
+
+		action_id := structs.NewId(action_id_base)
+		action, err := self.getAction(action_id)
+		if err != nil {
+			return nil, err
+		}
+
+		f := structs.NewFilter(id, val_title, is_regex_title, val_body, is_regex_body, action)
+
+		if err = rows.Err(); err != nil {
+			return nil, err
+		}
+		return f, nil
+	}
+	return nil, fmt.Errorf("cannot find the filter.")
+}
+
+func (self *Session) GetFilters() ([]*structs.Filter, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	rows, err := self.db.Query("SELECT * FROM filter")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	f_s := []*structs.Filter{}
+	action_cache := make(map[string]*structs.Action)
+	for rows.Next() {
+		var id_base        []byte
+		var val_title      string
+		var is_regex_title bool
+		var val_body       string
+		var is_regex_body  bool
+		var action_id_base []byte
+
+		err := rows.Scan(&id_base, &val_title, &is_regex_title, &val_body, &is_regex_body, &action_id_base)
+		if err != nil {
+			return nil, err
+		}
+		id := structs.NewId(id_base)
+		action_id := structs.NewId(action_id_base)
+
+		action, ok := action_cache[action_id.String()]
+		if !ok {
+			var err error
+			action, err = self.getAction(action_id)
+			if err != nil {
+				return nil, err
+			}
+
+			action_cache[action_id.String()] = action
+		}
+
+		f_s = append(f_s, structs.NewFilter(id, val_title, is_regex_title, val_body, is_regex_body, action))
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return f_s, nil
+}
+
+func (self *Session) DeleteFilter(id *structs.Id) error {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	if _, err := self.getFilter(id); err != nil {
+		return err
+	}
+
+	_, err := self.db.ExecContext(self.msn.AsContext(),
+		"DELETE FROM filter WHERE id = ?", id.Value())
+	return err
 }

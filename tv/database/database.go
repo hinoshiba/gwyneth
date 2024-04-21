@@ -37,23 +37,19 @@ type Session interface {
 	RemoveArticle(*structs.Id) error
 
 	GetFeed(*structs.Id, int64) ([]*structs.Article, error)
+	BindFeed(*structs.Id, *structs.Id) error
 	RemoveFeedEntry(*structs.Id, *structs.Id) error
 
-	/*
-	AddNoticer()
-	GetNoticers()
-	DeleteNoticer()
+	AddAction(name string, cmd string) (*structs.Action, error)
+	GetAction(action_id *structs.Id) (*structs.Action, error)
+	GetActions() ([]*structs.Action, error)
+	DeleteAction(action_id *structs.Id) error
 
-	AddFilterType()
-	GetFilterTypes()
-	GetFilterType()
-	DeleteFilterType()
-
-	AddFilter()
-	GetFilters()
-	GetFilter()
-	DeleteFilter()
-	*/
+	AddFilter(title string, regex_title bool, body string, regex_body bool, action_id *structs.Id) (*structs.Filter, error)
+	UpdateFilterAction(id *structs.Id, action_id *structs.Id) (*structs.Filter, error)
+	GetFilter(id *structs.Id) (*structs.Filter, error)
+	GetFilters() ([]*structs.Filter, error)
+	DeleteFilter(filter_id *structs.Id) error
 }
 
 func Connect(msn *task.Mission, cfg *config.Database) (Session, error) {

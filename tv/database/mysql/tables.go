@@ -3,8 +3,7 @@ package mysql
 func make_table_dict() ([]string, map[string]string) {
 	d := make(map[string]string)
 	order := []string{
-		"source_type", "source", "article", "feed", "noticer",
-		"filter_action", "filter", "filter_entry",
+		"source_type", "source", "article", "feed", "action", "filter",
 	}
 
 	d["source_type"] = TABLE_SOURCE_TYPE
@@ -12,49 +11,29 @@ func make_table_dict() ([]string, map[string]string) {
 	d["article"] = TABLE_ARTICLE
 	d["feed"] = TABLE_FEED
 
-	d["noticer"] = TABLE_NOTICER
-
 	d["filter"] = TABLE_FILTER
-	d["filter_action"] = TABLE_FILTER_ACTION
-	d["filter_entry"] = TABLE_FILTER_ENTRY
+	d["action"] = TABLE_ACTION
 
 	return order, d
 }
 
-const TABLE_FILTER_ACTION string = `
+const TABLE_ACTION string = `
 id BINARY(16) NOT NULL,
 name TEXT NOT NULL,
 command TEXT,
-user_create BOOLEAN NOT NULL DEFAULT 1,
 PRIMARY KEY (id)
 `
 // 1 is true at boolean
 
 const TABLE_FILTER string = `
 id BINARY(16) NOT NULL,
-title_filter TEXT NOT NULL,
-body_filter TEXT NOT NULL,
+val_title TEXT NOT NULL,
+is_regex_title BOOLEAN NOT NULL DEFAULT 0,
+val_body TEXT NOT NULL,
+is_regex_body BOOLEAN NOT NULL DEFAULT 0,
 action_id BINARY(16) NOT NULL,
 PRIMARY KEY (id),
-FOREIGN KEY (action_id) REFERENCES filter_action(id)
-`
-
-const TABLE_FILTER_ENTRY string = `
-filter_id BINARY(16) NOT NULL,
-action_id BINARY(16) NOT NULL,
-dst_id BINARY(16) NOT NULL,
-PRIMARY KEY (filter_id, action_id, dst_id),
-FOREIGN KEY (filter_id) REFERENCES filter(id),
-FOREIGN KEY (action_id) REFERENCES filter_action(id),
-FOREIGN KEY (dst_id) REFERENCES source(id)
-`
-
-const TABLE_NOTICER string = `
-id BINARY(16) NOT NULL,
-filter TEXT NOT NULL,
-dst_id BINARY(16) NOT NULL,
-PRIMARY KEY (id),
-FOREIGN KEY (dst_id) REFERENCES source(id)
+FOREIGN KEY (action_id) REFERENCES action(id)
 `
 
 const TABLE_SOURCE_TYPE string = `

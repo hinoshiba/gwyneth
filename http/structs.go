@@ -57,3 +57,48 @@ func convArticle(artcl *structs.Article) *Article {
 		Raw: artcl.Raw(),
 	}
 }
+
+type Action struct {
+	Id    string `json:"id"`
+	Name  string `json:"name"`
+	Cmd   string `json:"command"`
+}
+
+func convAction(action *structs.Action) *Action {
+	return &Action{
+		Id: action.Id().String(),
+		Name: action.Name(),
+		Cmd: action.Command(),
+	}
+}
+
+type Filter struct {
+	Id            string       `json:"id"`
+
+	Title         *FilterValue `json:"title"`
+	Body          *FilterValue `json:"body"`
+	IsRegexBody   bool         `json:"is_regex_at_body"`
+	SourcePettern *Source      `json:"source:`
+
+	Action        *Action      `json:"action"`
+}
+
+type FilterValue struct {
+	Value   string `json:"value"`
+	IsRegex bool `json:"is_regex"`
+}
+
+func convFilter(f *structs.Filter) *Filter {
+	return &Filter{
+		Id: f.Id().String(),
+		Title: &FilterValue{
+			Value: f.ValTitle(),
+			IsRegex: f.IsRegexTitle(),
+		},
+		Body: &FilterValue{
+			Value: f.ValBody(),
+			IsRegex: f.IsRegexBody(),
+		},
+		Action: convAction(f.Action()),
+	}
+}

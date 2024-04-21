@@ -284,6 +284,16 @@ func getHandlerAddArticle(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
+		src, err := g.GetSource(src_id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("source id is not exist: '%s'", article.Src.Id)})
+			return
+		}
+		if !src.Type().IsUserCreate() {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("cannot use the source type of system creation.: '%s'", article.Src.Id)})
+			return
+		}
+
 		added_article, err := g.AddArticle(article.Title, article.Body, article.Link, int64(article.Timestamp), article.Raw, src_id)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

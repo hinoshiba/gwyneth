@@ -172,6 +172,78 @@ func (self *Article) Raw() string {
 	return self.raw
 }
 
-type Noticer struct {}
-type FilterAction struct {}
-type Filter struct {}
+type Action struct {
+	id   *Id
+	name string
+	cmd  string
+}
+
+func NewAction(id *Id, name string, cmd string) *Action {
+	return &Action{
+		id: id,
+		name: name,
+		cmd: cmd,
+	}
+}
+
+func (self *Action) Id() *Id {
+	return self.id
+}
+
+func (self *Action) Name() string {
+	return self.name
+}
+
+func (self *Action) Command() string {
+	return self.cmd
+}
+
+type Filter struct {
+	id           *Id
+
+	val_title      string
+	is_regex_title bool
+
+	val_body       string
+	is_regex_body  bool
+
+	action       *Action
+}
+
+func NewFilter(id *Id, val_title string, is_regex_title bool, val_body string, is_regex_body bool, action *Action) *Filter {
+	return &Filter{
+		id: id,
+
+		val_title: val_title,
+		is_regex_title: is_regex_title,
+
+		val_body: val_body,
+		is_regex_body: is_regex_body,
+
+		action: action,
+	}
+}
+
+func (self *Filter) Id() *Id {
+	return self.id
+}
+
+func (self *Filter) ValTitle() string {
+	return self.val_title
+}
+
+func (self *Filter) IsRegexTitle() bool {
+	return self.is_regex_title
+}
+
+func (self *Filter) ValBody() string {
+	return self.val_body
+}
+
+func (self *Filter) IsRegexBody() bool {
+	return self.is_regex_body
+}
+
+func (self *Filter) Action() *Action {
+	return self.action
+}
