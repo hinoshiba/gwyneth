@@ -88,6 +88,16 @@ func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
 	self.engine.DELETE("/api/article", getHandlerRemoveArticle(g))
 
 	self.engine.GET("/api/feed", getHandlerGetFeed(self.cfg.Feed, g))
+
+	self.engine.GET("/api/action", getHandlerGetAction(g))
+	self.engine.POST("/api/action", getHandlerAddAction(g))
+	self.engine.DELETE("/api/action", getHandlerDeleteAction(g))
+
+	self.engine.GET("/api/filter", getHandlerGetFilter(g))
+	self.engine.POST("/api/filter", getHandlerAddFilter(g))
+	self.engine.PATCH("/api/filter", getHandlerUpdateFilter(g))
+	self.engine.DELETE("/api/filter", getHandlerDeleteFilter(g))
+
 	return nil
 }
 
@@ -110,12 +120,15 @@ func (self *Router) run() error {
 
 func getHandlerAddSourceType(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "this api is not published yet."})
+		return
+
 		var st SourceType
 		if err := c.ShouldBindJSON(&st); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.Debug(fmt.Sprintf("request is '%v'", st))
+		slog.Debug(fmt.Sprintf("AddSourceType: request is '%v'", st))
 
 		added_st, err := g.AddSourceType(st.Name, st.Cmd, true)
 		if err != nil {
@@ -163,12 +176,15 @@ func getHandlerGetSourceType(g *gwyneth.Gwyneth) func(*gin.Context) {
 
 func getHandlerDeleteSourceType(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "this api is not published yet."})
+		return
+
 		var st SourceType
 		if err := c.ShouldBindJSON(&st); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.Debug(fmt.Sprintf("request is '%v'", st))
+		slog.Debug(fmt.Sprintf("DeleteSourceType: request is '%v'", st))
 
 		id, err := structs.ParseStringId(st.Id)
 		if err != nil {
@@ -193,7 +209,7 @@ func getHandlerAddSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.Debug(fmt.Sprintf("request is '%v'", src))
+		slog.Debug(fmt.Sprintf("AddSource: request is '%v'", src))
 
 		src_type_id, err := structs.ParseStringId(src.Type.Id)
 		if err != nil {
@@ -276,7 +292,7 @@ func getHandlerAddArticle(g *gwyneth.Gwyneth) func(*gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.Debug(fmt.Sprintf("request is '%v'", article))
+		slog.Debug(fmt.Sprintf("AddArticle: request is '%v'", article))
 
 		src_id, err := structs.ParseStringId(article.Src.Id)
 		if err != nil {
@@ -439,4 +455,117 @@ func doResponseFeed(cfg *config.Feed, c *gin.Context, as []*structs.Article, fee
 	err_msg := fmt.Sprintf("unsupported type: '%s'", feed_type)
 	c.JSON(http.StatusBadRequest, gin.H{"error": err_msg})
 	return
+}
+
+func getHandlerGetAction(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		id_base := c.Query("id")
+		if id_base != "" {
+			id, err := structs.ParseStringId(id_base)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			action, err := g.GetAction(id)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			c.IndentedJSON(http.StatusOK, []*Action{convAction(action)})
+			return
+		}
+
+		actions, err := g.GetActions()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		ret_actions := []*Action{}
+		for _, action := range actions {
+			ret_actions = append(ret_actions, convAction(action))
+		}
+		c.IndentedJSON(http.StatusOK, ret_actions)
+	}
+}
+
+func getHandlerAddAction(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		var action Action
+		if err := c.ShouldBindJSON(&action); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		slog.Debug(fmt.Sprintf("AddAciton: request is '%v'", action))
+
+		added_action, err := g.AddAction(action.Name, action.Cmd)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.IndentedJSON(http.StatusOK, convAction(added_action))
+	}
+}
+
+func getHandlerDeleteAction(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		var action Action
+		if err := c.ShouldBindJSON(&action); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		id, err := structs.ParseStringId(action.Id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := g.DeleteAction(id); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"id": action.Id,
+		})
+	}
+}
+
+func getHandlerGetFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "TODO:WIP",
+		})
+		return
+	}
+}
+
+func getHandlerAddFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "TODO:WIP",
+		})
+		return
+	}
+}
+
+func getHandlerUpdateFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "TODO:WIP",
+		})
+		return
+	}
+}
+
+func getHandlerDeleteFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "TODO:WIP",
+		})
+		return
+	}
 }

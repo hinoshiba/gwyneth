@@ -173,6 +173,7 @@ func (self *Gwyneth) run_rss_collector(msn *task.Mission, artcl_ch chan <- *stru
 func (self *Gwyneth) checkAndInitSourceTypes() error {
 	defaults := map[string]string{
 		"rss": "rss",
+		"noop": "noop",
 	}
 	self.default_source_type = make(map[string]struct{})
 
@@ -292,6 +293,14 @@ func (self *Gwyneth) GetActions() ([]*structs.Action, error) {
 
 func (self *Gwyneth) getActions() ([]*structs.Action, error) {
 	return self.tv.GetActions()
+}
+
+func (self *Gwyneth) GetAction(id *structs.Id) (*structs.Action, error) {
+	return self.getAction(id)
+}
+
+func (self *Gwyneth) getAction(id *structs.Id) (*structs.Action, error) {
+	return self.tv.GetAction(id)
 }
 
 func (self *Gwyneth) DeleteAction(id *structs.Id) error {
