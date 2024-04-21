@@ -545,10 +545,27 @@ func getHandlerGetFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 
 func getHandlerAddFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "TODO:WIP",
-		})
-		return
+		var f Filter
+		if err := c.ShouldBindJSON(&f); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		slog.Debug(fmt.Sprintf("AddFilter: request is '%v'", f))
+
+		action_id, err := structs.ParseStringId(f.Action.Id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		added_f, err := g.AddFilter(f.Title.Value, f.Title.IsRegex,
+									f.Body.Value, f.Body.IsRegex, action_id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.IndentedJSON(http.StatusOK, convFilter(added_f))
 	}
 }
 

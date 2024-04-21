@@ -77,8 +77,6 @@ type Filter struct {
 
 	Title         *FilterValue `json:"title"`
 	Body          *FilterValue `json:"body"`
-	IsRegexBody   bool         `json:"is_regex_at_body"`
-	SourcePettern *Source      `json:"source:`
 
 	Action        *Action      `json:"action"`
 }

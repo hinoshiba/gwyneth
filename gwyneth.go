@@ -335,6 +335,14 @@ func (self *Gwyneth) getFilters() ([]*structs.Filter, error) {
 	return self.tv.GetFilters()
 }
 
+func (self *Gwyneth) GetFilter(id *structs.Id) (*structs.Filter, error) {
+	return self.getFilter(id)
+}
+
+func (self *Gwyneth) getFilter(id *structs.Id) (*structs.Filter, error) {
+	return self.tv.GetFilter(id)
+}
+
 func (self *Gwyneth) DeleteFilter(id *structs.Id) error {
 	return self.deleteFilter(id)
 }
