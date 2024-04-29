@@ -536,10 +536,35 @@ func getHandlerDeleteAction(g *gwyneth.Gwyneth) func(*gin.Context) {
 
 func getHandlerGetFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "TODO:WIP",
-		})
-		return
+		id_base := c.Query("id")
+		if id_base != "" {
+			id, err := structs.ParseStringId(id_base)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			f, err := g.GetFilter(id)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			c.IndentedJSON(http.StatusOK, []*Filter{convFilter(f)})
+			return
+		}
+
+		fs, err := g.GetFilters()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		ret_fs := []*Filter{}
+		for _, f := range fs {
+			ret_fs = append(ret_fs, convFilter(f))
+		}
+		c.IndentedJSON(http.StatusOK, ret_fs)
 	}
 }
 
@@ -571,18 +596,53 @@ func getHandlerAddFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 
 func getHandlerUpdateFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "TODO:WIP",
-		})
-		return
+		var f Filter
+		if err := c.ShouldBindJSON(&f); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		id, err := structs.ParseStringId(f.Id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		action_id, err := structs.ParseStringId(f.Action.Id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		updated_f, err := g.UpdateFilterAction(id, action_id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, convFilter(updated_f))
 	}
 }
 
 func getHandlerDeleteFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
+		var f Filter
+		if err := c.ShouldBindJSON(&f); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		id, err := structs.ParseStringId(f.Id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := g.DeleteFilter(id); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
 		c.JSON(http.StatusOK, gin.H{
-			"message": "TODO:WIP",
+			"id": f.Id,
 		})
-		return
 	}
 }

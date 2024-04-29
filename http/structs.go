@@ -83,7 +83,7 @@ type Filter struct {
 
 type FilterValue struct {
 	Value   string `json:"value"`
-	IsRegex bool `json:"is_regex"`
+	IsRegex bool   `json:"regex"`
 }
 
 func convFilter(f *structs.Filter) *Filter {
