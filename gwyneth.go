@@ -172,6 +172,7 @@ func (self *Gwyneth) run_rss_collector(msn *task.Mission, artcl_ch chan <- *stru
 
 func (self *Gwyneth) checkAndInitSourceTypes() error {
 	defaults := map[string]string{
+		"webapi": "webapi",
 		"rss": "rss",
 		"noop": "noop",
 	}
@@ -349,6 +350,38 @@ func (self *Gwyneth) DeleteFilter(id *structs.Id) error {
 
 func (self *Gwyneth) deleteFilter(id *structs.Id) error {
 	return self.tv.DeleteFilter(id)
+}
+
+func (self *Gwyneth) BindFilter(src_id *structs.Id, f_id *structs.Id) error {
+	return self.bindFilter(src_id, f_id)
+}
+
+func (self *Gwyneth) bindFilter(src_id *structs.Id, f_id *structs.Id) error {
+	return self.tv.BindFilter(src_id, f_id)
+}
+
+func (self *Gwyneth) UnBindFilter(src_id *structs.Id, f_id *structs.Id) error {
+	return self.unBindFilter(src_id, f_id)
+}
+
+func (self *Gwyneth) unBindFilter(src_id *structs.Id, f_id *structs.Id) error {
+	return self.tv.UnBindFilter(src_id, f_id)
+}
+
+func (self *Gwyneth) GetFilterOnSource(src_id *structs.Id) ([]*structs.Filter, error) {
+	return self.getFilterOnSource(src_id)
+}
+
+func (self *Gwyneth) getFilterOnSource(src_id *structs.Id) ([]*structs.Filter, error) {
+	return self.tv.GetFilterOnSource(src_id)
+}
+
+func (self *Gwyneth) GetSourceWithEnabledFilter(f_id *structs.Id) ([]*structs.Source, error) {
+	return self.getSourceWithEnabledFilter(f_id)
+}
+
+func (self *Gwyneth) getSourceWithEnabledFilter(f_id *structs.Id) ([]*structs.Source, error) {
+	return self.tv.GetSourceWithEnabledFilter(f_id)
 }
 
 func rss_collector(msn *task.Mission, args ...any) {

@@ -50,6 +50,11 @@ type Session interface {
 	GetFilter(id *structs.Id) (*structs.Filter, error)
 	GetFilters() ([]*structs.Filter, error)
 	DeleteFilter(id *structs.Id) error
+
+	BindFilter(src_id *structs.Id, f_id *structs.Id) error
+	UnBindFilter(src_id *structs.Id, f_id *structs.Id) error
+	GetFilterOnSource(src_id *structs.Id) ([]*structs.Filter, error)
+	GetSourceWithEnabledFilter(f_id *structs.Id) ([]*structs.Source, error)
 }
 
 func Connect(msn *task.Mission, cfg *config.Database) (Session, error) {

@@ -243,3 +243,31 @@ func (self *TimeVortex) DeleteFilter(id *structs.Id) error {
 
 	return self.db.DeleteFilter(id)
 }
+
+func (self *TimeVortex) BindFilter(src_id *structs.Id, f_id *structs.Id) error {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	return self.db.BindFilter(src_id, f_id)
+}
+
+func (self *TimeVortex) UnBindFilter(src_id *structs.Id, f_id *structs.Id) error {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	return self.db.UnBindFilter(src_id, f_id)
+}
+
+func (self *TimeVortex) GetFilterOnSource(src_id *structs.Id) ([]*structs.Filter, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	return self.db.GetFilterOnSource(src_id)
+}
+
+func (self *TimeVortex) GetSourceWithEnabledFilter(f_id *structs.Id) ([]*structs.Source, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	return self.db.GetSourceWithEnabledFilter(f_id)
+}

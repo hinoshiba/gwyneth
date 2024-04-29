@@ -75,13 +75,18 @@ func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
 		})
 	})
 
-	self.engine.GET("/api/source_type", getHandlerGetSourceType(g))
+	self.engine.GET("/api/source_type", getHandlerGetSourceTypes(g))
 	self.engine.POST("/api/source_type", getHandlerAddSourceType(g))
 	self.engine.DELETE("api/source_type", getHandlerDeleteSourceType(g))
 
-	self.engine.GET("/api/source", getHandlerGetSource(g))
+	self.engine.GET("/api/source", getHandlerGetSources(g))
 	self.engine.POST("/api/source", getHandlerAddSource(g))
 	self.engine.DELETE("/api/source", getHandlerDeleteSource(g))
+
+	self.engine.GET("/api/source/:id", getHandlerGetSource(g))
+	self.engine.POST("/api/source/:id/filter", getHandlerBindFilter(g))
+	self.engine.GET("/api/source/:id/filter", getHandlerGetFilterOnSource(g))
+	self.engine.DELETE("/api/source/:id/filter", getHandlerUnBindFilter(g))
 
 	self.engine.GET("/api/article", getHandlerLookupArticles(self.cfg.Feed, g))
 	self.engine.POST("/api/article", getHandlerAddArticle(g))
@@ -89,11 +94,11 @@ func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
 
 	self.engine.GET("/api/feed", getHandlerGetFeed(self.cfg.Feed, g))
 
-	self.engine.GET("/api/action", getHandlerGetAction(g))
+	self.engine.GET("/api/action", getHandlerGetActions(g))
 	self.engine.POST("/api/action", getHandlerAddAction(g))
 	self.engine.DELETE("/api/action", getHandlerDeleteAction(g))
 
-	self.engine.GET("/api/filter", getHandlerGetFilter(g))
+	self.engine.GET("/api/filter", getHandlerGetFilters(g))
 	self.engine.POST("/api/filter", getHandlerAddFilter(g))
 	self.engine.PATCH("/api/filter", getHandlerUpdateFilter(g))
 	self.engine.DELETE("/api/filter", getHandlerDeleteFilter(g))
@@ -140,7 +145,7 @@ func getHandlerAddSourceType(g *gwyneth.Gwyneth) func(*gin.Context) {
 	}
 }
 
-func getHandlerGetSourceType(g *gwyneth.Gwyneth) func(*gin.Context) {
+func getHandlerGetSourceTypes(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
 		id_base := c.Query("id")
 		if id_base != "" {
@@ -227,7 +232,7 @@ func getHandlerAddSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 	}
 }
 
-func getHandlerGetSource(g *gwyneth.Gwyneth) func(*gin.Context) {
+func getHandlerGetSources(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
 		id_base := c.Query("id")
 		if id_base != "" {
@@ -457,7 +462,7 @@ func doResponseFeed(cfg *config.Feed, c *gin.Context, as []*structs.Article, fee
 	return
 }
 
-func getHandlerGetAction(g *gwyneth.Gwyneth) func(*gin.Context) {
+func getHandlerGetActions(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
 		id_base := c.Query("id")
 		if id_base != "" {
@@ -534,7 +539,7 @@ func getHandlerDeleteAction(g *gwyneth.Gwyneth) func(*gin.Context) {
 	}
 }
 
-func getHandlerGetFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
+func getHandlerGetFilters(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
 		id_base := c.Query("id")
 		if id_base != "" {
@@ -644,5 +649,127 @@ func getHandlerDeleteFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"id": f.Id,
 		})
+	}
+}
+
+func getHandlerGetSource(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		id_base := c.Param("id")
+		id, err := structs.ParseStringId(id_base)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		src, err := g.GetSource(id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.IndentedJSON(http.StatusOK, convSource(src))
+	}
+}
+
+func getHandlerBindFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		id_base := c.Param("id")
+		id, err := structs.ParseStringId(id_base)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		var f Filter
+		if err := c.ShouldBindJSON(&f); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		slog.Debug(fmt.Sprintf("BindFilter: request is '%v'", f))
+
+		f_id, err := structs.ParseStringId(f.Id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := g.BindFilter(id, f_id); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		fs, err := g.GetFilterOnSource(id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		ret_fs := []*Filter{}
+		for _, f := range fs {
+			ret_fs = append(ret_fs, convFilter(f))
+		}
+		c.IndentedJSON(http.StatusOK, ret_fs)
+	}
+}
+
+func getHandlerGetFilterOnSource(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		id_base := c.Param("id")
+		id, err := structs.ParseStringId(id_base)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		fs, err := g.GetFilterOnSource(id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		ret_fs := []*Filter{}
+		for _, f := range fs {
+			ret_fs = append(ret_fs, convFilter(f))
+		}
+		c.IndentedJSON(http.StatusOK, ret_fs)
+	}
+}
+
+func getHandlerUnBindFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		id_base := c.Param("id")
+		id, err := structs.ParseStringId(id_base)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		var f Filter
+		if err := c.ShouldBindJSON(&f); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		slog.Debug(fmt.Sprintf("BindFilter: request is '%v'", f))
+
+		f_id, err := structs.ParseStringId(f.Id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := g.UnBindFilter(id, f_id); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		fs, err := g.GetFilterOnSource(id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		ret_fs := []*Filter{}
+		for _, f := range fs {
+			ret_fs = append(ret_fs, convFilter(f))
+		}
+		c.IndentedJSON(http.StatusOK, ret_fs)
 	}
 }

@@ -3,16 +3,20 @@ package mysql
 func make_table_dict() ([]string, map[string]string) {
 	d := make(map[string]string)
 	order := []string{
-		"source_type", "source", "article", "feed", "action", "filter",
+		"source_type", "source",
+		"action", "filter", "src_filter_map",
+		"article", "feed",
 	}
 
 	d["source_type"] = TABLE_SOURCE_TYPE
 	d["source"] = TABLE_SOURCE
-	d["article"] = TABLE_ARTICLE
-	d["feed"] = TABLE_FEED
 
 	d["filter"] = TABLE_FILTER
 	d["action"] = TABLE_ACTION
+	d["src_filter_map"] = TABLE_SOURCE_FILTER_MAP
+
+	d["article"] = TABLE_ARTICLE
+	d["feed"] = TABLE_FEED
 
 	return order, d
 }
@@ -34,6 +38,14 @@ is_regex_body BOOLEAN NOT NULL DEFAULT 0,
 action_id BINARY(16) NOT NULL,
 PRIMARY KEY (id),
 FOREIGN KEY (action_id) REFERENCES action(id)
+`
+
+const TABLE_SOURCE_FILTER_MAP string = `
+filter_id BINARY(16) NOT NULL,
+src_id BINARY(16) NOT NULL,
+PRIMARY KEY (filter_id, src_id),
+FOREIGN KEY (filter_id) REFERENCES filter(id),
+FOREIGN KEY (src_id) REFERENCES source(id)
 `
 
 const TABLE_SOURCE_TYPE string = `

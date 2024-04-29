@@ -831,3 +831,87 @@ func (self *Session) DeleteFilter(id *structs.Id) error {
 		"DELETE FROM filter WHERE id = ?", id.Value())
 	return err
 }
+
+func (self *Session) BindFilter(src_id *structs.Id, f_id *structs.Id) error {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	_, err := self.db.ExecContext(self.msn.AsContext(),
+		"INSERT INTO src_filter_map (src_id, filter_id) VALUES (?, ?)",
+		src_id.Value(), f_id.Value())
+	return err
+}
+
+func (self *Session) UnBindFilter(src_id *structs.Id, f_id *structs.Id) error {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	_, err := self.db.ExecContext(self.msn.AsContext(),
+			"DELETE FROM src_filter_map WHERE src_id = ? AND filter_id = ?",
+												src_id.Value(), f_id.Value())
+	return err
+}
+
+func (self *Session) GetFilterOnSource(src_id *structs.Id) ([]*structs.Filter, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	rows, err := self.db.Query("SELECT filter_id FROM src_filter_map WHERE src_id = ?", src_id.Value())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	fs := []*structs.Filter{}
+	for rows.Next() {
+		var id_base        []byte
+
+		if err := rows.Scan(&id_base); err != nil {
+			return nil, err
+		}
+
+		id := structs.NewId(id_base)
+		f, err := self.getFilter(id)
+		if err != nil {
+			return nil, err
+		}
+		fs = append(fs, f)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return fs, nil
+}
+
+func (self *Session) GetSourceWithEnabledFilter(f_id *structs.Id) ([]*structs.Source, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	rows, err := self.db.Query("SELECT filter_id FROM src_filter_map WHERE filter_id = ?", f_id.Value())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	srcs := []*structs.Source{}
+	for rows.Next() {
+		var id_base        []byte
+
+		if err := rows.Scan(&id_base); err != nil {
+			return nil, err
+		}
+
+		id := structs.NewId(id_base)
+		src, err := self.getSource(id)
+		if err != nil {
+			return nil, err
+		}
+		srcs = append(srcs, src)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return srcs, nil
+}
