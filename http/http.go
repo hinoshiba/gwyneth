@@ -59,14 +59,40 @@ func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
 	self.engine.Static("/static", "/usr/local/src/http/static")
 	self.engine.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index.html", gin.H{
-		 "message": fmt.Sprintf("Welcome to Gwyneth %s", consts.VERSION),
+			"message": fmt.Sprintf("Welcome to Gwyneth %s", consts.VERSION),
 		})
 	})
 	self.engine.GET("/source_type", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "source_type.html", gin.H{})
+		c.HTML(http.StatusOK, "source_type.html", gin.H{
+			"message": fmt.Sprintf("Welcome to Gwyneth %s", consts.VERSION),
+		})
+
 	})
 	self.engine.GET("/source", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "source.html", gin.H{})
+		c.HTML(http.StatusOK, "source.html", gin.H{
+			"message": fmt.Sprintf("Welcome to Gwyneth %s", consts.VERSION),
+		})
+	})
+
+	self.engine.GET("/source/:id", func(c *gin.Context) {
+		src_id := c.Param("id")
+
+		c.HTML(http.StatusOK, "source_detail.html", gin.H{
+			"message": fmt.Sprintf("Welcome to Gwyneth %s", consts.VERSION),
+			"src_id": fmt.Sprintf("%s", src_id),
+		})
+	})
+
+	self.engine.GET("/action", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "action.html", gin.H{
+			"message": fmt.Sprintf("Welcome to Gwyneth %s", consts.VERSION),
+		})
+	})
+
+	self.engine.GET("/filter", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "filter.html", gin.H{
+			"message": fmt.Sprintf("Welcome to Gwyneth %s", consts.VERSION),
+		})
 	})
 
 	self.engine.GET("/api/ping", func(c *gin.Context) {
@@ -93,6 +119,8 @@ func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
 	self.engine.DELETE("/api/article", getHandlerRemoveArticle(g))
 
 	self.engine.GET("/api/feed", getHandlerGetFeed(self.cfg.Feed, g))
+	self.engine.POST("/api/feed", getHandlerPostFeed(self.cfg.Feed, g))
+	self.engine.DELETE("/api/feed", getHandlerDeleteFeed(self.cfg.Feed, g))
 
 	self.engine.GET("/api/action", getHandlerGetActions(g))
 	self.engine.POST("/api/action", getHandlerAddAction(g))
@@ -414,6 +442,80 @@ func getHandlerGetFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Context) 
 		}
 
 		doResponseFeed(cfg, c, as, feed_type)
+	}
+}
+
+func getHandlerPostFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		var article Article
+		if err := c.ShouldBindJSON(&article); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		slog.Debug(fmt.Sprintf("BindFeed: request is '%v'", article))
+
+		article_id, err := structs.ParseStringId(article.Id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("cannot parse article id('%s'): %s", article.Id, err)})
+			return
+		}
+
+		src_id, err := structs.ParseStringId(article.Src.Id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("cannot parse src id('%s'): %s", article.Src.Id, err)})
+			return
+		}
+
+		if _, err := g.GetSource(src_id); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("source id is not exist: '%s'", article.Src.Id)})
+			return
+		}
+
+		if err := g.BindFeed(src_id, article_id); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"message": "success",
+		})
+	}
+}
+
+func getHandlerDeleteFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		var article Article
+		if err := c.ShouldBindJSON(&article); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		slog.Debug(fmt.Sprintf("UnBindFeed: request is '%v'", article))
+
+		article_id, err := structs.ParseStringId(article.Id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("cannot parse article id('%s'): %s", article.Id, err)})
+			return
+		}
+
+		src_id, err := structs.ParseStringId(article.Src.Id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("cannot parse src id('%s'): %s", article.Src.Id, err)})
+			return
+		}
+
+		if _, err := g.GetSource(src_id); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("source id is not exist: '%s'", article.Src.Id)})
+			return
+		}
+
+		if err := g.RemoveFeedEntry(src_id, article_id); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"message": "success",
+		})
 	}
 }
 

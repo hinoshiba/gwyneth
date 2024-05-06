@@ -3,38 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API Source Types</title>
+    <title>API Action</title>
 </head>
 <body>
     <h1 style="color: rebeccapurple;"><a href="../">{{.message}}</a></h1>
     <hr>
-    <h1>Source Types</h1>
+    <h1>Actions</h1>
     <div id="addForm">
-        <h3>Add New Source Type</h3>
+        <h3>Add New Action</h3>
         <label for="name">Name:</label>
         <input type="text" id="name">
         <label for="command">Command:</label>
         <input type="text" id="command">
-        <button onclick="addSourceType()">Add</button>
+        <button onclick="addAction()">Add</button>
     </div>
     <hr>
 
-    <table id="sourceTypesTable">
+    <table id="actionsTable">
         <thead>
             <tr>
                 <th>ID</th>
                 <th>Name</th>
                 <th>Command</th>
-                <th>UserCreate</th>
-                <th>Action</th>
             </tr>
         </thead>
-        <tbody id="sourceTypesTableBody"></tbody>
+        <tbody id="actionsTableBody"></tbody>
     </table>
 
     <script>
-        function fetchSourceTypes() {
-            fetch('../api/source_type', {
+        function fetchActions() {
+            fetch('../api/action', {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json'
@@ -42,25 +40,24 @@
             })
             .then(response => response.json())
             .then(data => {
-                const tableBody = document.getElementById('sourceTypesTableBody');
+                const tableBody = document.getElementById('actionsTableBody');
                 tableBody.innerHTML = '';
-                data.forEach(sourceType => {
+                data.forEach(action => {
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td>${sourceType.id}</td>
-                        <td>${sourceType.name}</td>
-                        <td>${sourceType.command}</td>
-                        <td>${sourceType.user_create}</td>
-                        <td><button onclick="deleteSourceType('${sourceType.id}')">Delete</button></td>
+                        <td>${action.id}</td>
+                        <td>${action.name}</td>
+                        <td>${action.command}</td>
+                        <td><button onclick="deleteAction('${action.id}')">Delete</button></td>
                     `;
                     tableBody.appendChild(row);
                 });
             })
-            .catch(error => console.error('Error fetching source types:', error));
+            .catch(error => console.error('Error fetching actions:', error));
         }
 
-        function deleteSourceType(id) {
-            fetch(`../api/source_type`, {
+        function deleteAction(id) {
+            fetch(`../api/action`, {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json'
@@ -69,19 +66,19 @@
             })
             .then(response => {
                 if (response.ok) {
-                    fetchSourceTypes(); // Refresh table after deletion
+                    fetchActions();
                 } else {
-                    console.error('Failed to delete source type');
+                    console.error('Failed to delete action');
                 }
             })
-            .catch(error => console.error('Error deleting source type:', error));
+            .catch(error => console.error('Error deleting action:', error));
         }
 
-        function addSourceType() {
+        function addAction() {
             const name = document.getElementById('name').value;
             const command = document.getElementById('command').value;
 
-            fetch('../api/source_type', {
+            fetch('../api/action', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -90,16 +87,16 @@
             })
             .then(response => {
                 if (response.ok) {
-                    fetchSourceTypes();
+                    fetchActions();
                     document.getElementById('name').value = '';
                     document.getElementById('command').value = '';
                 } else {
-                    console.error('Failed to add source type');
+                    console.error('Failed to add action');
                 }
             })
-            .catch(error => console.error('Error adding source type:', error));
+            .catch(error => console.error('Error adding action:', error));
         }
-        window.onload = fetchSourceTypes;
+        window.onload = fetchActions;
     </script>
 </body>
 </html>

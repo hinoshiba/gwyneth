@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+    <h1 style="color: rebeccapurple;"><a href="../../">{{.message}}</a></h1>
+    <h1 style="color: rebeccapurple;"><a href="../">Sources</a></h1>
+    <hr>
+    <h1>Source Detail</h1>
+    <p><a href="../api/feed?src_id={{.src_id}}" target="_blank" rel="noopener noreferrer">Feed URL</a></p>
+    <hr>
+    <h1>Filter</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Enable</th>
+                <th>Title</th>
+                <th>TitleRegex</th>
+                <th>Body</th>
+                <th>BodyRegex</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="filtersTableBody"></tbody>
+    </table>
+    <hr>
+    <script>
+        function fetchFilters() {
+            fetch('../api/source/{{.src_id}}/filter', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                const buf = {};
+                data.forEach(filter => {
+                    buf[filter.id] = true;
+                });
+                return buf;
+            })
+            .then(buf => {
+                fetch('../api/filter', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    const tableBody = document.getElementById('filtersTableBody');
+                    tableBody.innerHTML = ''; // Clear existing table data
+                    data.forEach(filter => {
+                        const row = document.createElement('tr');
+
+                        let check_clm = `<td><input type="checkbox" onchange="Check(this, '${filter.id}')"/></td>`;
+                        if (buf.hasOwnProperty(filter.id)) {
+                            check_clm = `<td><input type="checkbox" onchange="Check(this, '${filter.id}')" checked /></td>`;
+                        }
+                        row.innerHTML = `
+                            ${check_clm}
+                            <td>${filter.title.value}</td>
+                            <td>${filter.title.regex}</td>
+                            <td>${filter.body.value}</td>
+                            <td>${filter.body.regex}</td>
+                            <td>${filter.action.name}</td>
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                })
+            })
+            .catch(error => console.error('Error fetching filters:', error));
+        }
+
+        function Check(checkbox, id) {
+            if (checkbox.checked) {
+                fetch('../api/source/{{.src_id}}/filter', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ id }),
+                })
+                .then(response => {
+                    if (!(response.ok)) {
+                        console.error('Failed to delete filter');
+                        checkbox.checked = false;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error deleting filter:', error);
+                    checkbox.checked = false;
+                });
+            } else {
+                fetch('../api/source/{{.src_id}}/filter', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ id }),
+                })
+                .then(response => {
+                    if (!(response.ok)) {
+                        console.error('Failed to delete filter');
+                        checkbox.checked = true;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error deleting filter:', error);
+                    checkbox.checked = true;
+                });
+            }
+        };
+
+        window.onload = function () {
+            fetchFilters();
+        };
+    </script>
+</body>
+</html>
+

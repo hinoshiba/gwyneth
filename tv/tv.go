@@ -174,6 +174,13 @@ func (self *TimeVortex) GetFeed(src_id *structs.Id, limit int64) ([]*structs.Art
 	return self.db.GetFeed(src_id, limit)
 }
 
+func (self *TimeVortex) BindFeed(src_id *structs.Id, article_id *structs.Id) error {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	return self.db.BindFeed(src_id, article_id)
+}
+
 func (self *TimeVortex) RemoveFeedEntry(src_id *structs.Id, article_id *structs.Id) error {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()

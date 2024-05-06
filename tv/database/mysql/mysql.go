@@ -17,6 +17,8 @@ import (
 import (
 	"github.com/hinoshiba/gwyneth/config"
 	"github.com/hinoshiba/gwyneth/structs"
+
+	"github.com/hinoshiba/gwyneth/tv/errors"
 )
 
 const (
@@ -445,7 +447,7 @@ func (self *Session) AddArticle(title string, body string, link string, unixtime
 		return nil, err
 	}
 	if !(len(as) < 1) {
-		return as[0], nil
+		return as[0], errors.ERR_ALREADY_EXIST_ARTICLE
 	}
 
 	id := structs.NewId(nil)

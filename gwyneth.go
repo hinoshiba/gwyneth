@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 	"time"
+	"regexp"
+	"strings"
 )
 
 import (
@@ -16,6 +18,8 @@ import (
 	"github.com/hinoshiba/gwyneth/structs"
 	//"github.com/hinoshiba/gwyneth/consts"
 
+	"github.com/hinoshiba/gwyneth/tv/errors"
+
 	"github.com/hinoshiba/gwyneth/collector/rss"
 )
 
@@ -27,7 +31,10 @@ type Gwyneth struct {
 	tv  *tv.TimeVortex
 	msn *task.Mission
 
-	new_src chan struct{}
+	new_src       *noticer
+	update_filter *noticer
+
+	artcl_ch chan *structs.Article
 
 	default_source_type map[string]struct{}
 }
@@ -41,7 +48,10 @@ func New(msn *task.Mission, cfg *config.Config) (*Gwyneth, error) {
 		tv: t,
 		msn: msn,
 
-		new_src: make(chan struct{}),
+		artcl_ch: make(chan *structs.Article),
+
+		new_src:       newNoticer(msn.NewCancel()),
+		update_filter: newNoticer(msn.NewCancel()),
 	}
 
 	if err := self.init(); err != nil {
@@ -62,52 +72,120 @@ func (self *Gwyneth) init() error {
 	if err := self.checkAndInitSourceTypes(); err != nil {
 		return err
 	}
-	go self.run_collector(self.msn.New())
-	self.reload_collector()
+	go self.run_core(self.msn.New())
+
+	self.new_src.Notice()
+	self.update_filter.Notice()
 	return nil
 }
 
-func (self *Gwyneth) run_collector(msn *task.Mission) {
+func (self *Gwyneth) run_core(msn *task.Mission) {
 	defer msn.Done()
 
-	artcl_ch := make(chan *structs.Article)
-	defer close(artcl_ch)
-
-	var p_msn *task.Mission
+	var msn_clctr *task.Mission
+	var msn_rcdr  *task.Mission
 	for {
 		select {
-		case <- self.new_src:
-			if p_msn != nil {
-				p_msn.Cancel()
-			}
-
-			p_msn = msn.New()
-			go func(p_msn *task.Mission){
-				defer p_msn.Done()
-
-				self.run_rss_collector(p_msn.New(), artcl_ch)
-			}(p_msn)
 		case <- msn.RecvCancel():
 			return
-		case artcl := <- artcl_ch:
-			if _, err := self.addArticle(artcl.Title(), artcl.Body(), artcl.Link(), artcl.Unixtime(), artcl.Raw(), artcl.Src().Id()); err != nil {
+		case <- self.new_src.Recv():
+			if msn_clctr != nil {
+				msn_clctr.Cancel()
+			}
+
+			msn_clctr = msn.New()
+			go func(msn_clctr *task.Mission){
+				defer msn_clctr.Done()
+
+				if err := self.run_rss_collector(msn_clctr.New()); err != nil {
+					slog.Error(fmt.Sprintf("failed: wakeup rss collector: %s", err))
+				}
+			}(msn_clctr)
+		case <- self.update_filter.Recv():
+			if msn_rcdr != nil {
+				msn_rcdr.Cancel()
+			}
+
+			msn_rcdr = msn.New()
+			go func(msn_rcdr *task.Mission){
+				defer msn_rcdr.Done()
+
+				if err := self.run_article_recoder(msn_rcdr.New()); err !=nil {
+					slog.Error(fmt.Sprintf("failed: wakeup article recorder: %s", err))
+				}
+			}(msn_rcdr)
+		}
+	}
+}
+
+func (self *Gwyneth) run_article_recoder(msn *task.Mission) error {
+	defer msn.Done()
+	fmt.Println("run article recorder")
+
+	f_buf := make(map[string][]*structs.Filter)
+
+	for {
+		select {
+		case <- msn.RecvCancel():
+			return nil
+		case artcl := <- self.artcl_ch:
+			a, err := self.addArticle(artcl.Title(), artcl.Body(), artcl.Link(), artcl.Unixtime(), artcl.Raw(), artcl.Src().Id())
+			if err != nil {
+				if err == errors.ERR_ALREADY_EXIST_ARTICLE {
+					continue
+				}
 				slog.Warn(fmt.Sprintf("failed: addArticle: %s", err))
 				continue
+			}
+
+			fs, ok := f_buf[a.Src().Id().String()]
+			if !ok {
+				new_fs, err := self.getFilterOnSource(a.Src().Id())
+				if err != nil {
+					slog.Warn(fmt.Sprintf("failed: cannot get filters for '%s': %s", a.Src().Id().String(), err))
+					continue
+				}
+
+				fs = new_fs
+				f_buf[a.Src().Id().String()] = new_fs
+			}
+
+			for _, f := range fs {
+				is_match := false
+
+				if f.IsRegexTitle() {
+					match, _ := regexp.MatchString(f.ValTitle(), a.Title())
+					if match {
+						is_match = true
+					}
+				} else {
+					if strings.Contains(a.Title(), f.ValTitle()) {
+						is_match = true
+					}
+				}
+
+				if f.IsRegexBody() {
+					match, _ := regexp.MatchString(f.ValBody(), a.Body())
+					if match {
+						is_match = true
+					}
+				} else {
+					if strings.Contains(a.Body(), f.ValBody()) {
+						is_match = true
+					}
+				}
+
+				if is_match {
+					action := f.Action()
+					slog.Debug(fmt.Sprintf("want to do '%s' '%s'", action.Name(), action.Command()))
+					//WIP: Todo: dummy
+				}
 			}
 		}
 	}
 }
 
-func (self *Gwyneth) reload_collector() {
-	go func(cc task.Canceller) {
-		select {
-		case <-cc.RecvCancel():
-		case self.new_src <- struct{}{}:
-		}
-	}(self.msn.NewCancel())
-}
-
-func (self *Gwyneth) run_rss_collector(msn *task.Mission, artcl_ch chan <- *structs.Article) error {
+func (self *Gwyneth) run_rss_collector(msn *task.Mission) error {
 	defer msn.Done()
 
 	p := task.NewPool(msn.New(), COLLECTOR_RSS_POOL_SIZE)
@@ -163,7 +241,7 @@ func (self *Gwyneth) run_rss_collector(msn *task.Mission, artcl_ch chan <- *stru
 				}
 
 				for _, tgt := range tgts {
-					p.Do(rss_collector, msn.New(), tgt, artcl_ch)
+					p.Do(rss_collector, msn.New(), tgt, self.artcl_ch)
 				}
 			}()
 		}
@@ -172,7 +250,6 @@ func (self *Gwyneth) run_rss_collector(msn *task.Mission, artcl_ch chan <- *stru
 
 func (self *Gwyneth) checkAndInitSourceTypes() error {
 	defaults := map[string]string{
-		"webapi": "webapi",
 		"rss": "rss",
 		"noop": "noop",
 	}
@@ -220,8 +297,13 @@ func (self *Gwyneth) DeleteSourceType(id *structs.Id) error {
 }
 
 func (self *Gwyneth) AddSource(title string, src_type_id *structs.Id, source string) (*structs.Source, error) {
-	self.reload_collector()
-	return self.tv.AddSource(title, src_type_id, source)
+	s, err := self.tv.AddSource(title, src_type_id, source)
+	if err != nil {
+		return nil, err
+	}
+
+	self.new_src.Notice()
+	return s, nil
 }
 
 func (self *Gwyneth) GetSource(id *structs.Id) (*structs.Source, error) {
@@ -237,11 +319,23 @@ func (self *Gwyneth) FindSource(kw string) ([]*structs.Source, error) {
 }
 
 func (self *Gwyneth) DeleteSource(id *structs.Id) error {
-	return self.tv.DeleteSource(id)
+	if err := self.tv.DeleteSource(id); err != nil {
+		return err
+	}
+
+	self.new_src.Notice()
+	return nil
 }
 
 func (self *Gwyneth) AddArticle(title string, body string, link string, utime int64, raw string, src_id *structs.Id) (*structs.Article, error){
-	return self.addArticle(title, body, link, utime, raw, src_id)
+	//WIP: do filter when call api.
+	a, err := self.addArticle(title, body, link, utime, raw, src_id)
+	if err != nil {
+		if err != errors.ERR_ALREADY_EXIST_ARTICLE {
+			return nil, err
+		}
+	}
+	return a, nil
 }
 
 func (self *Gwyneth) addArticle(title string, body string, link string, utime int64, raw string, src_id *structs.Id) (*structs.Article, error){
@@ -272,6 +366,14 @@ func (self *Gwyneth) getFeed(src_id *structs.Id, limit int64) ([]*structs.Articl
 	return self.tv.GetFeed(src_id, limit)
 }
 
+func (self *Gwyneth) BindFeed(src_id *structs.Id, artcl_id *structs.Id) error {
+	return self.bindFeed(src_id, artcl_id)
+}
+
+func (self *Gwyneth) bindFeed(src_id *structs.Id, artcl_id *structs.Id) error {
+	return self.tv.BindFeed(src_id, artcl_id)
+}
+
 func (self *Gwyneth) RemoveFeedEntry(src_id *structs.Id, article_id *structs.Id) error {
 	return self.removeFeedEntry(src_id, article_id)
 }
@@ -285,7 +387,13 @@ func (self *Gwyneth) AddAction(name string, cmd string) (*structs.Action, error)
 }
 
 func (self *Gwyneth) addAction(name string, cmd string) (*structs.Action, error) {
-	return self.tv.AddAction(name, cmd)
+	action, err := self.tv.AddAction(name, cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	self.update_filter.Notice()
+	return action, nil
 }
 
 func (self *Gwyneth) GetActions() ([]*structs.Action, error) {
@@ -309,7 +417,12 @@ func (self *Gwyneth) DeleteAction(id *structs.Id) error {
 }
 
 func (self *Gwyneth) deleteAction(id *structs.Id) error {
-	return self.tv.DeleteAction(id)
+	if err := self.tv.DeleteAction(id); err != nil {
+		return err
+	}
+
+	self.update_filter.Notice()
+	return nil
 }
 
 func (self *Gwyneth) AddFilter(title string, regex_title bool, body string, regex_body bool, action_id *structs.Id) (*structs.Filter, error) {
@@ -317,7 +430,26 @@ func (self *Gwyneth) AddFilter(title string, regex_title bool, body string, rege
 }
 
 func (self *Gwyneth) addFilter(title string, regex_title bool, body string, regex_body bool, action_id *structs.Id) (*structs.Filter, error) {
-	return self.tv.AddFilter(title, regex_title, body, regex_body, action_id)
+	if regex_title {
+		_, err := regexp.Compile(title)
+		if err != nil {
+			return nil, fmt.Errorf("cannot compile regex at title :'%s'", err)
+		}
+	}
+	if regex_body {
+		_, err := regexp.Compile(body)
+		if err != nil {
+			return nil, fmt.Errorf("cannot compile regex at body :'%s'", err)
+		}
+	}
+
+	f, err := self.tv.AddFilter(title, regex_title, body, regex_body, action_id)
+	if err != nil {
+		return nil, err
+	}
+
+	self.update_filter.Notice()
+	return f, nil
 }
 
 func (self *Gwyneth) UpdateFilterAction(id *structs.Id, action_id *structs.Id) (*structs.Filter, error) {
@@ -325,7 +457,13 @@ func (self *Gwyneth) UpdateFilterAction(id *structs.Id, action_id *structs.Id) (
 }
 
 func (self *Gwyneth) updateFilterAction(id *structs.Id, action_id *structs.Id) (*structs.Filter, error) {
-	return self.tv.UpdateFilterAction(id, action_id)
+	f, err := self.tv.UpdateFilterAction(id, action_id)
+	if err != nil {
+		return nil, err
+	}
+
+	self.update_filter.Notice()
+	return f, nil
 }
 
 func (self *Gwyneth) GetFilters() ([]*structs.Filter, error) {
@@ -349,7 +487,12 @@ func (self *Gwyneth) DeleteFilter(id *structs.Id) error {
 }
 
 func (self *Gwyneth) deleteFilter(id *structs.Id) error {
-	return self.tv.DeleteFilter(id)
+	if err := self.tv.DeleteFilter(id); err != nil {
+		return err
+	}
+
+	self.update_filter.Notice()
+	return nil
 }
 
 func (self *Gwyneth) BindFilter(src_id *structs.Id, f_id *structs.Id) error {
@@ -388,7 +531,7 @@ func rss_collector(msn *task.Mission, args ...any) {
 	defer msn.Done()
 
 	src := args[0].(*structs.Source)
-	artcl_ch := args[1].(chan <- *structs.Article)
+	artcl_ch := args[1].(chan *structs.Article)
 
 	if task.IsCanceled(msn) {
 		slog.Info(fmt.Sprintf("the collector of '%s' is canceld", src.Title()))
@@ -399,7 +542,7 @@ func rss_collector(msn *task.Mission, args ...any) {
 	if err := rss.GetFeed(msn.New(), src, artcl_ch); err != nil {
 		slog.Warn(fmt.Sprintf("cannot collect '%s/%s': %s", src.Title(), src.Value(), err))
 	}
-	slog.Debug(fmt.Sprintf("the collector of '%s' done!!!"))
+	slog.Debug(fmt.Sprintf("the collector of '%s' done!!!", src.Title()))
 }
 
 func split_src(size int, src_s []*structs.Source) [][]*structs.Source {
@@ -421,4 +564,29 @@ func split_src(size int, src_s []*structs.Source) [][]*structs.Source {
 		ret = append(ret, src_s[i:end])
 	}
 	return ret
+}
+
+type noticer struct {
+	msg_ch chan struct{}
+	cc     task.Canceller
+}
+
+func newNoticer(cc task.Canceller) *noticer {
+	return &noticer{
+		msg_ch: make(chan struct{}),
+		cc: cc,
+	}
+}
+
+func (self *noticer) Recv() <- chan struct{} {
+	return self.msg_ch
+}
+
+func (self *noticer) Notice() {
+	go func () {
+		select {
+		case <-self.cc.RecvCancel():
+		case self.msg_ch <- struct{}{}:
+		}
+	}()
 }
