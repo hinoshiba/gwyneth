@@ -16,7 +16,6 @@ import (
 	"github.com/hinoshiba/gwyneth/tv"
 	"github.com/hinoshiba/gwyneth/structs"
 	"github.com/hinoshiba/gwyneth/filter"
-	//"github.com/hinoshiba/gwyneth/consts"
 
 	"github.com/hinoshiba/gwyneth/tv/errors"
 
@@ -131,17 +130,17 @@ func (self *Gwyneth) run_article_recoder(msn *task.Mission) error {
 		case artcl := <- self.artcl_ch:
 			a, err := self.addArticle(artcl.Title(), artcl.Body(), artcl.Link(), artcl.Unixtime(), artcl.Raw(), artcl.Src().Id())
 			if err != nil {
+				/* //debug all do filter
 				if err != errors.ERR_ALREADY_EXIST_ARTICLE {
 					slog.Warn(fmt.Sprintf("failed: addArticle: %s", err))
 					continue
 				}
-				/*
+				*/
 				if err == errors.ERR_ALREADY_EXIST_ARTICLE {
 					continue
 				}
 				slog.Warn(fmt.Sprintf("failed: addArticle: %s", err))
 				continue
-				*/
 			}
 
 			fs, ok := f_buf[a.Src().Id().String()]
@@ -156,15 +155,22 @@ func (self *Gwyneth) run_article_recoder(msn *task.Mission) error {
 				f_buf[a.Src().Id().String()] = new_fs
 			}
 
-			for _, f := range fs {
-				if f.IsMatch(a) {
-					action := f.Action()
+			func (msn *task.Mission) {
+				defer msn.Done()
 
-					if err := action.Do(msn.New(), a); err != nil {
-						slog.Error(fmt.Sprintf("failed: execute filter: %s", err))
-					}
+				for _, f := range fs {
+					go func(msn *task.Mission, f filter.Filter) {
+						defer msn.Done()
+						if f.IsMatch(a) {
+							action := f.Action()
+
+							if err := action.Do(msn.New(), a); err != nil {
+								slog.Error(fmt.Sprintf("failed: execute filter: %s", err))
+							}
+						}
+					}(msn.New(), *f)
 				}
-			}
+			}(msn.New())
 		}
 	}
 }
