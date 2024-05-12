@@ -8,6 +8,10 @@ import (
 	"github.com/google/uuid"
 )
 
+import (
+	"github.com/hinoshiba/gwyneth/structs/external"
+)
+
 type Id struct {
 	id string
 }
@@ -90,6 +94,15 @@ func (self *SourceType) IsUserCreate() bool {
 	return self.user_create
 }
 
+func (self *SourceType) ConvertExternal() *external.SourceType {
+	return &external.SourceType{
+		Id: self.id.String(),
+		Name: self.name,
+		Cmd: self.cmd,
+		UserCreate: self.user_create,
+	}
+}
+
 type Source struct {
 	id       *Id
 	title    string
@@ -120,6 +133,15 @@ func (self *Source) Type() *SourceType {
 
 func (self *Source) Value() string {
 	return self.val
+}
+
+func (self *Source) ConvertExternal() *external.Source {
+	return &external.Source {
+		Id: self.id.String(),
+		Title: self.title,
+		Type: self.src_type.ConvertExternal(),
+		Value: self.val,
+	}
 }
 
 type Article struct {
@@ -172,78 +194,14 @@ func (self *Article) Raw() string {
 	return self.raw
 }
 
-type Action struct {
-	id   *Id
-	name string
-	cmd  string
-}
-
-func NewAction(id *Id, name string, cmd string) *Action {
-	return &Action{
-		id: id,
-		name: name,
-		cmd: cmd,
+func (self *Article) ConvertExternal() *external.Article {
+	return &external.Article{
+		Id: self.id.String(),
+		Src: self.src.ConvertExternal(),
+		Title: self.title,
+		Body: self.body,
+		Link: self.link,
+		Timestamp: int(self.utime),
+		Raw: self.raw,
 	}
-}
-
-func (self *Action) Id() *Id {
-	return self.id
-}
-
-func (self *Action) Name() string {
-	return self.name
-}
-
-func (self *Action) Command() string {
-	return self.cmd
-}
-
-type Filter struct {
-	id           *Id
-
-	val_title      string
-	is_regex_title bool
-
-	val_body       string
-	is_regex_body  bool
-
-	action       *Action
-}
-
-func NewFilter(id *Id, val_title string, is_regex_title bool, val_body string, is_regex_body bool, action *Action) *Filter {
-	return &Filter{
-		id: id,
-
-		val_title: val_title,
-		is_regex_title: is_regex_title,
-
-		val_body: val_body,
-		is_regex_body: is_regex_body,
-
-		action: action,
-	}
-}
-
-func (self *Filter) Id() *Id {
-	return self.id
-}
-
-func (self *Filter) ValTitle() string {
-	return self.val_title
-}
-
-func (self *Filter) IsRegexTitle() bool {
-	return self.is_regex_title
-}
-
-func (self *Filter) ValBody() string {
-	return self.val_body
-}
-
-func (self *Filter) IsRegexBody() bool {
-	return self.is_regex_body
-}
-
-func (self *Filter) Action() *Action {
-	return self.action
 }

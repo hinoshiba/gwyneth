@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"time"
 	"regexp"
-	"strings"
 )
 
 import (
@@ -16,6 +15,7 @@ import (
 	"github.com/hinoshiba/gwyneth/config"
 	"github.com/hinoshiba/gwyneth/tv"
 	"github.com/hinoshiba/gwyneth/structs"
+	"github.com/hinoshiba/gwyneth/filter"
 	//"github.com/hinoshiba/gwyneth/consts"
 
 	"github.com/hinoshiba/gwyneth/tv/errors"
@@ -122,7 +122,7 @@ func (self *Gwyneth) run_article_recoder(msn *task.Mission) error {
 	defer msn.Done()
 	fmt.Println("run article recorder")
 
-	f_buf := make(map[string][]*structs.Filter)
+	f_buf := make(map[string][]*filter.Filter)
 
 	for {
 		select {
@@ -131,11 +131,17 @@ func (self *Gwyneth) run_article_recoder(msn *task.Mission) error {
 		case artcl := <- self.artcl_ch:
 			a, err := self.addArticle(artcl.Title(), artcl.Body(), artcl.Link(), artcl.Unixtime(), artcl.Raw(), artcl.Src().Id())
 			if err != nil {
+				if err != errors.ERR_ALREADY_EXIST_ARTICLE {
+					slog.Warn(fmt.Sprintf("failed: addArticle: %s", err))
+					continue
+				}
+				/*
 				if err == errors.ERR_ALREADY_EXIST_ARTICLE {
 					continue
 				}
 				slog.Warn(fmt.Sprintf("failed: addArticle: %s", err))
 				continue
+				*/
 			}
 
 			fs, ok := f_buf[a.Src().Id().String()]
@@ -151,34 +157,12 @@ func (self *Gwyneth) run_article_recoder(msn *task.Mission) error {
 			}
 
 			for _, f := range fs {
-				is_match := false
-
-				if f.IsRegexTitle() {
-					match, _ := regexp.MatchString(f.ValTitle(), a.Title())
-					if match {
-						is_match = true
-					}
-				} else {
-					if strings.Contains(a.Title(), f.ValTitle()) {
-						is_match = true
-					}
-				}
-
-				if f.IsRegexBody() {
-					match, _ := regexp.MatchString(f.ValBody(), a.Body())
-					if match {
-						is_match = true
-					}
-				} else {
-					if strings.Contains(a.Body(), f.ValBody()) {
-						is_match = true
-					}
-				}
-
-				if is_match {
+				if f.IsMatch(a) {
 					action := f.Action()
-					slog.Debug(fmt.Sprintf("want to do '%s' '%s'", action.Name(), action.Command()))
-					//WIP: Todo: dummy
+
+					if err := action.Do(msn.New(), a); err != nil {
+						slog.Error(fmt.Sprintf("failed: execute filter: %s", err))
+					}
 				}
 			}
 		}
@@ -328,7 +312,6 @@ func (self *Gwyneth) DeleteSource(id *structs.Id) error {
 }
 
 func (self *Gwyneth) AddArticle(title string, body string, link string, utime int64, raw string, src_id *structs.Id) (*structs.Article, error){
-	//WIP: do filter when call api.
 	a, err := self.addArticle(title, body, link, utime, raw, src_id)
 	if err != nil {
 		if err != errors.ERR_ALREADY_EXIST_ARTICLE {
@@ -382,11 +365,11 @@ func (self *Gwyneth) removeFeedEntry(src_id *structs.Id, article_id *structs.Id)
 	return self.tv.RemoveFeedEntry(src_id, article_id)
 }
 
-func (self *Gwyneth) AddAction(name string, cmd string) (*structs.Action, error) {
+func (self *Gwyneth) AddAction(name string, cmd string) (*filter.Action, error) {
 	return self.addAction(name, cmd)
 }
 
-func (self *Gwyneth) addAction(name string, cmd string) (*structs.Action, error) {
+func (self *Gwyneth) addAction(name string, cmd string) (*filter.Action, error) {
 	action, err := self.tv.AddAction(name, cmd)
 	if err != nil {
 		return nil, err
@@ -396,19 +379,19 @@ func (self *Gwyneth) addAction(name string, cmd string) (*structs.Action, error)
 	return action, nil
 }
 
-func (self *Gwyneth) GetActions() ([]*structs.Action, error) {
+func (self *Gwyneth) GetActions() ([]*filter.Action, error) {
 	return self.getActions()
 }
 
-func (self *Gwyneth) getActions() ([]*structs.Action, error) {
+func (self *Gwyneth) getActions() ([]*filter.Action, error) {
 	return self.tv.GetActions()
 }
 
-func (self *Gwyneth) GetAction(id *structs.Id) (*structs.Action, error) {
+func (self *Gwyneth) GetAction(id *structs.Id) (*filter.Action, error) {
 	return self.getAction(id)
 }
 
-func (self *Gwyneth) getAction(id *structs.Id) (*structs.Action, error) {
+func (self *Gwyneth) getAction(id *structs.Id) (*filter.Action, error) {
 	return self.tv.GetAction(id)
 }
 
@@ -425,11 +408,11 @@ func (self *Gwyneth) deleteAction(id *structs.Id) error {
 	return nil
 }
 
-func (self *Gwyneth) AddFilter(title string, regex_title bool, body string, regex_body bool, action_id *structs.Id) (*structs.Filter, error) {
+func (self *Gwyneth) AddFilter(title string, regex_title bool, body string, regex_body bool, action_id *structs.Id) (*filter.Filter, error) {
 	return self.addFilter(title, regex_title, body, regex_body, action_id)
 }
 
-func (self *Gwyneth) addFilter(title string, regex_title bool, body string, regex_body bool, action_id *structs.Id) (*structs.Filter, error) {
+func (self *Gwyneth) addFilter(title string, regex_title bool, body string, regex_body bool, action_id *structs.Id) (*filter.Filter, error) {
 	if regex_title {
 		_, err := regexp.Compile(title)
 		if err != nil {
@@ -452,11 +435,11 @@ func (self *Gwyneth) addFilter(title string, regex_title bool, body string, rege
 	return f, nil
 }
 
-func (self *Gwyneth) UpdateFilterAction(id *structs.Id, action_id *structs.Id) (*structs.Filter, error) {
+func (self *Gwyneth) UpdateFilterAction(id *structs.Id, action_id *structs.Id) (*filter.Filter, error) {
 	return self.updateFilterAction(id, action_id)
 }
 
-func (self *Gwyneth) updateFilterAction(id *structs.Id, action_id *structs.Id) (*structs.Filter, error) {
+func (self *Gwyneth) updateFilterAction(id *structs.Id, action_id *structs.Id) (*filter.Filter, error) {
 	f, err := self.tv.UpdateFilterAction(id, action_id)
 	if err != nil {
 		return nil, err
@@ -466,19 +449,19 @@ func (self *Gwyneth) updateFilterAction(id *structs.Id, action_id *structs.Id) (
 	return f, nil
 }
 
-func (self *Gwyneth) GetFilters() ([]*structs.Filter, error) {
+func (self *Gwyneth) GetFilters() ([]*filter.Filter, error) {
 	return self.getFilters()
 }
 
-func (self *Gwyneth) getFilters() ([]*structs.Filter, error) {
+func (self *Gwyneth) getFilters() ([]*filter.Filter, error) {
 	return self.tv.GetFilters()
 }
 
-func (self *Gwyneth) GetFilter(id *structs.Id) (*structs.Filter, error) {
+func (self *Gwyneth) GetFilter(id *structs.Id) (*filter.Filter, error) {
 	return self.getFilter(id)
 }
 
-func (self *Gwyneth) getFilter(id *structs.Id) (*structs.Filter, error) {
+func (self *Gwyneth) getFilter(id *structs.Id) (*filter.Filter, error) {
 	return self.tv.GetFilter(id)
 }
 
@@ -500,7 +483,12 @@ func (self *Gwyneth) BindFilter(src_id *structs.Id, f_id *structs.Id) error {
 }
 
 func (self *Gwyneth) bindFilter(src_id *structs.Id, f_id *structs.Id) error {
-	return self.tv.BindFilter(src_id, f_id)
+	if err := self.tv.BindFilter(src_id, f_id); err != nil {
+		return err
+	}
+
+	self.update_filter.Notice()
+	return nil
 }
 
 func (self *Gwyneth) UnBindFilter(src_id *structs.Id, f_id *structs.Id) error {
@@ -508,14 +496,19 @@ func (self *Gwyneth) UnBindFilter(src_id *structs.Id, f_id *structs.Id) error {
 }
 
 func (self *Gwyneth) unBindFilter(src_id *structs.Id, f_id *structs.Id) error {
-	return self.tv.UnBindFilter(src_id, f_id)
+	if err := self.tv.UnBindFilter(src_id, f_id); err != nil {
+		return err
+	}
+
+	self.update_filter.Notice()
+	return nil
 }
 
-func (self *Gwyneth) GetFilterOnSource(src_id *structs.Id) ([]*structs.Filter, error) {
+func (self *Gwyneth) GetFilterOnSource(src_id *structs.Id) ([]*filter.Filter, error) {
 	return self.getFilterOnSource(src_id)
 }
 
-func (self *Gwyneth) getFilterOnSource(src_id *structs.Id) ([]*structs.Filter, error) {
+func (self *Gwyneth) getFilterOnSource(src_id *structs.Id) ([]*filter.Filter, error) {
 	return self.tv.GetFilterOnSource(src_id)
 }
 

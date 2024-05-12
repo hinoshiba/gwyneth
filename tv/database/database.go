@@ -13,6 +13,7 @@ import (
 	"github.com/hinoshiba/gwyneth/tv/database/mysql"
 
 	"github.com/hinoshiba/gwyneth/structs"
+	"github.com/hinoshiba/gwyneth/filter"
 )
 
 var (
@@ -40,20 +41,20 @@ type Session interface {
 	BindFeed(*structs.Id, *structs.Id) error
 	RemoveFeedEntry(*structs.Id, *structs.Id) error
 
-	AddAction(name string, cmd string) (*structs.Action, error)
-	GetAction(id *structs.Id) (*structs.Action, error)
-	GetActions() ([]*structs.Action, error)
+	AddAction(name string, cmd string) (*filter.Action, error)
+	GetAction(id *structs.Id) (*filter.Action, error)
+	GetActions() ([]*filter.Action, error)
 	DeleteAction(id *structs.Id) error
 
-	AddFilter(title string, regex_title bool, body string, regex_body bool, action_id *structs.Id) (*structs.Filter, error)
-	UpdateFilterAction(id *structs.Id, action_id *structs.Id) (*structs.Filter, error)
-	GetFilter(id *structs.Id) (*structs.Filter, error)
-	GetFilters() ([]*structs.Filter, error)
+	AddFilter(title string, regex_title bool, body string, regex_body bool, action_id *structs.Id) (*filter.Filter, error)
+	UpdateFilterAction(id *structs.Id, action_id *structs.Id) (*filter.Filter, error)
+	GetFilter(id *structs.Id) (*filter.Filter, error)
+	GetFilters() ([]*filter.Filter, error)
 	DeleteFilter(id *structs.Id) error
 
 	BindFilter(src_id *structs.Id, f_id *structs.Id) error
 	UnBindFilter(src_id *structs.Id, f_id *structs.Id) error
-	GetFilterOnSource(src_id *structs.Id) ([]*structs.Filter, error)
+	GetFilterOnSource(src_id *structs.Id) ([]*filter.Filter, error)
 	GetSourceWithEnabledFilter(f_id *structs.Id) ([]*structs.Source, error)
 }
 

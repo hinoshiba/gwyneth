@@ -17,6 +17,7 @@ import (
 import (
 	"github.com/hinoshiba/gwyneth/config"
 	"github.com/hinoshiba/gwyneth/structs"
+	"github.com/hinoshiba/gwyneth/filter"
 
 	"github.com/hinoshiba/gwyneth/tv/errors"
 )
@@ -606,7 +607,7 @@ func (self *Session) query4article(q string, args ...any) ([]*structs.Article, e
 	return articles, nil
 }
 
-func (self *Session) AddAction(name string, cmd string) (*structs.Action, error) {
+func (self *Session) AddAction(name string, cmd string) (*filter.Action, error) {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
@@ -618,10 +619,10 @@ func (self *Session) AddAction(name string, cmd string) (*structs.Action, error)
 		return nil, err
 	}
 
-	return structs.NewAction(id, name, cmd), nil
+	return filter.NewAction(id, name, cmd), nil
 }
 
-func (self *Session) GetActions() ([]*structs.Action, error) {
+func (self *Session) GetActions() ([]*filter.Action, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
@@ -631,7 +632,7 @@ func (self *Session) GetActions() ([]*structs.Action, error) {
 	}
 	defer rows.Close()
 
-	actions := []*structs.Action{}
+	actions := []*filter.Action{}
 	for rows.Next() {
 		var id_base []byte
 		var name string
@@ -642,7 +643,7 @@ func (self *Session) GetActions() ([]*structs.Action, error) {
 			return nil, err
 		}
 		id := structs.NewId(id_base)
-		action := structs.NewAction(id, name, cmd)
+		action := filter.NewAction(id, name, cmd)
 
 		actions = append(actions, action)
 	}
@@ -653,14 +654,14 @@ func (self *Session) GetActions() ([]*structs.Action, error) {
 	return actions, nil
 }
 
-func (self *Session) GetAction(id *structs.Id) (*structs.Action, error) {
+func (self *Session) GetAction(id *structs.Id) (*filter.Action, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
 	return self.getAction(id)
 }
 
-func (self *Session) getAction(id *structs.Id) (*structs.Action, error) {
+func (self *Session) getAction(id *structs.Id) (*filter.Action, error) {
 	rows, err := self.db.Query("SELECT * FROM action WHERE id = ? LIMIT 1", id.Value())
 	if err != nil {
 		return nil, err
@@ -676,7 +677,7 @@ func (self *Session) getAction(id *structs.Id) (*structs.Action, error) {
 			return nil, err
 		}
 		id = structs.NewId(id_base)
-		action := structs.NewAction(id, name, cmd)
+		action := filter.NewAction(id, name, cmd)
 
 		if err = rows.Err(); err != nil {
 			return nil, err
@@ -699,7 +700,7 @@ func (self *Session) DeleteAction(id *structs.Id) error {
 	return err
 }
 
-func (self *Session) AddFilter(title string, regex_title bool, body string, regex_body bool, action_id *structs.Id) (*structs.Filter, error) {
+func (self *Session) AddFilter(title string, regex_title bool, body string, regex_body bool, action_id *structs.Id) (*filter.Filter, error) {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
@@ -715,7 +716,7 @@ func (self *Session) AddFilter(title string, regex_title bool, body string, rege
 	return self.getFilter(id)
 }
 
-func (self *Session) UpdateFilterAction(id *structs.Id, action_id *structs.Id) (*structs.Filter, error) {
+func (self *Session) UpdateFilterAction(id *structs.Id, action_id *structs.Id) (*filter.Filter, error) {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
@@ -731,14 +732,14 @@ func (self *Session) UpdateFilterAction(id *structs.Id, action_id *structs.Id) (
 	return self.getFilter(id)
 }
 
-func (self *Session) GetFilter(id *structs.Id) (*structs.Filter, error) {
+func (self *Session) GetFilter(id *structs.Id) (*filter.Filter, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
 	return self.getFilter(id)
 }
 
-func (self *Session) getFilter(id *structs.Id) (*structs.Filter, error) {
+func (self *Session) getFilter(id *structs.Id) (*filter.Filter, error) {
 	rows, err := self.db.Query("SELECT * FROM filter WHERE id = ? LIMIT 1", id.Value())
 	if err != nil {
 		return nil, err
@@ -764,7 +765,7 @@ func (self *Session) getFilter(id *structs.Id) (*structs.Filter, error) {
 			return nil, err
 		}
 
-		f := structs.NewFilter(id, val_title, is_regex_title, val_body, is_regex_body, action)
+		f := filter.NewFilter(id, val_title, is_regex_title, val_body, is_regex_body, action)
 
 		if err = rows.Err(); err != nil {
 			return nil, err
@@ -774,7 +775,7 @@ func (self *Session) getFilter(id *structs.Id) (*structs.Filter, error) {
 	return nil, fmt.Errorf("cannot find the filter.")
 }
 
-func (self *Session) GetFilters() ([]*structs.Filter, error) {
+func (self *Session) GetFilters() ([]*filter.Filter, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
@@ -784,8 +785,8 @@ func (self *Session) GetFilters() ([]*structs.Filter, error) {
 	}
 	defer rows.Close()
 
-	f_s := []*structs.Filter{}
-	action_cache := make(map[string]*structs.Action)
+	f_s := []*filter.Filter{}
+	action_cache := make(map[string]*filter.Action)
 	for rows.Next() {
 		var id_base        []byte
 		var val_title      string
@@ -812,7 +813,7 @@ func (self *Session) GetFilters() ([]*structs.Filter, error) {
 			action_cache[action_id.String()] = action
 		}
 
-		f_s = append(f_s, structs.NewFilter(id, val_title, is_regex_title, val_body, is_regex_body, action))
+		f_s = append(f_s, filter.NewFilter(id, val_title, is_regex_title, val_body, is_regex_body, action))
 	}
 
 	if err := rows.Err(); err != nil {
@@ -854,7 +855,7 @@ func (self *Session) UnBindFilter(src_id *structs.Id, f_id *structs.Id) error {
 	return err
 }
 
-func (self *Session) GetFilterOnSource(src_id *structs.Id) ([]*structs.Filter, error) {
+func (self *Session) GetFilterOnSource(src_id *structs.Id) ([]*filter.Filter, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
@@ -864,7 +865,7 @@ func (self *Session) GetFilterOnSource(src_id *structs.Id) ([]*structs.Filter, e
 	}
 	defer rows.Close()
 
-	fs := []*structs.Filter{}
+	fs := []*filter.Filter{}
 	for rows.Next() {
 		var id_base        []byte
 

@@ -18,6 +18,7 @@ import (
 	"github.com/hinoshiba/gwyneth/consts"
 	"github.com/hinoshiba/gwyneth/config"
 	"github.com/hinoshiba/gwyneth/structs"
+	"github.com/hinoshiba/gwyneth/structs/external"
 )
 
 func init() {
@@ -156,7 +157,7 @@ func getHandlerAddSourceType(g *gwyneth.Gwyneth) func(*gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "this api is not published yet."})
 		return
 
-		var st SourceType
+		var st external.SourceType
 		if err := c.ShouldBindJSON(&st); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -169,7 +170,7 @@ func getHandlerAddSourceType(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		c.IndentedJSON(http.StatusOK, convSourceType(added_st))
+		c.IndentedJSON(http.StatusOK, added_st.ConvertExternal())
 	}
 }
 
@@ -189,7 +190,7 @@ func getHandlerGetSourceTypes(g *gwyneth.Gwyneth) func(*gin.Context) {
 				return
 			}
 
-			c.IndentedJSON(http.StatusOK, []*SourceType{convSourceType(st)})
+			c.IndentedJSON(http.StatusOK, []*external.SourceType{st.ConvertExternal()})
 			return
 		}
 
@@ -199,9 +200,9 @@ func getHandlerGetSourceTypes(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		ret_sts := []*SourceType{}
+		ret_sts := []*external.SourceType{}
 		for _, st := range sts {
-			ret_sts = append(ret_sts, convSourceType(st))
+			ret_sts = append(ret_sts, st.ConvertExternal())
 		}
 		c.IndentedJSON(http.StatusOK, ret_sts)
 	}
@@ -212,7 +213,7 @@ func getHandlerDeleteSourceType(g *gwyneth.Gwyneth) func(*gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "this api is not published yet."})
 		return
 
-		var st SourceType
+		var st external.SourceType
 		if err := c.ShouldBindJSON(&st); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -237,7 +238,7 @@ func getHandlerDeleteSourceType(g *gwyneth.Gwyneth) func(*gin.Context) {
 
 func getHandlerAddSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		var src Source
+		var src external.Source
 		if err := c.ShouldBindJSON(&src); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -256,7 +257,7 @@ func getHandlerAddSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		c.IndentedJSON(http.StatusOK, convSource(added_src))
+		c.IndentedJSON(http.StatusOK, added_src.ConvertExternal())
 	}
 }
 
@@ -276,7 +277,7 @@ func getHandlerGetSources(g *gwyneth.Gwyneth) func(*gin.Context) {
 				return
 			}
 
-			c.IndentedJSON(http.StatusOK, []*Source{convSource(src)})
+			c.IndentedJSON(http.StatusOK, []*external.Source{src.ConvertExternal()})
 			return
 		}
 
@@ -286,9 +287,9 @@ func getHandlerGetSources(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		ret_src := []*Source{}
+		ret_src := []*external.Source{}
 		for _, src := range srcs {
-			ret_src = append(ret_src, convSource(src))
+			ret_src = append(ret_src, src.ConvertExternal())
 		}
 		c.IndentedJSON(http.StatusOK, ret_src)
 	}
@@ -296,7 +297,7 @@ func getHandlerGetSources(g *gwyneth.Gwyneth) func(*gin.Context) {
 
 func getHandlerDeleteSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		var src Source
+		var src external.Source
 		if err := c.ShouldBindJSON(&src); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -320,7 +321,7 @@ func getHandlerDeleteSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 
 func getHandlerAddArticle(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		var article Article
+		var article external.Article
 		if err := c.ShouldBindJSON(&article); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -349,13 +350,13 @@ func getHandlerAddArticle(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		c.IndentedJSON(http.StatusOK, convArticle(added_article))
+		c.IndentedJSON(http.StatusOK, added_article.ConvertExternal())
 	}
 }
 
 func getHandlerRemoveArticle(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		var article Article
+		var article external.Article
 		if err := c.ShouldBindJSON(&article); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -447,7 +448,7 @@ func getHandlerGetFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Context) 
 
 func getHandlerPostFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		var article Article
+		var article external.Article
 		if err := c.ShouldBindJSON(&article); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -484,7 +485,7 @@ func getHandlerPostFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Context)
 
 func getHandlerDeleteFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		var article Article
+		var article external.Article
 		if err := c.ShouldBindJSON(&article); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -580,7 +581,7 @@ func getHandlerGetActions(g *gwyneth.Gwyneth) func(*gin.Context) {
 				return
 			}
 
-			c.IndentedJSON(http.StatusOK, []*Action{convAction(action)})
+			c.IndentedJSON(http.StatusOK, []*external.Action{action.ConvertExternal()})
 			return
 		}
 
@@ -590,9 +591,9 @@ func getHandlerGetActions(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		ret_actions := []*Action{}
+		ret_actions := []*external.Action{}
 		for _, action := range actions {
-			ret_actions = append(ret_actions, convAction(action))
+			ret_actions = append(ret_actions, action.ConvertExternal())
 		}
 		c.IndentedJSON(http.StatusOK, ret_actions)
 	}
@@ -600,7 +601,7 @@ func getHandlerGetActions(g *gwyneth.Gwyneth) func(*gin.Context) {
 
 func getHandlerAddAction(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		var action Action
+		var action external.Action
 		if err := c.ShouldBindJSON(&action); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -613,13 +614,13 @@ func getHandlerAddAction(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		c.IndentedJSON(http.StatusOK, convAction(added_action))
+		c.IndentedJSON(http.StatusOK, added_action.ConvertExternal())
 	}
 }
 
 func getHandlerDeleteAction(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		var action Action
+		var action external.Action
 		if err := c.ShouldBindJSON(&action); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -657,7 +658,7 @@ func getHandlerGetFilters(g *gwyneth.Gwyneth) func(*gin.Context) {
 				return
 			}
 
-			c.IndentedJSON(http.StatusOK, []*Filter{convFilter(f)})
+			c.IndentedJSON(http.StatusOK, []*external.Filter{f.ConvertExternal()})
 			return
 		}
 
@@ -667,9 +668,9 @@ func getHandlerGetFilters(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		ret_fs := []*Filter{}
+		ret_fs := []*external.Filter{}
 		for _, f := range fs {
-			ret_fs = append(ret_fs, convFilter(f))
+			ret_fs = append(ret_fs, f.ConvertExternal())
 		}
 		c.IndentedJSON(http.StatusOK, ret_fs)
 	}
@@ -677,7 +678,7 @@ func getHandlerGetFilters(g *gwyneth.Gwyneth) func(*gin.Context) {
 
 func getHandlerAddFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		var f Filter
+		var f external.Filter
 		if err := c.ShouldBindJSON(&f); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -697,13 +698,13 @@ func getHandlerAddFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		c.IndentedJSON(http.StatusOK, convFilter(added_f))
+		c.IndentedJSON(http.StatusOK, added_f.ConvertExternal())
 	}
 }
 
 func getHandlerUpdateFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		var f Filter
+		var f external.Filter
 		if err := c.ShouldBindJSON(&f); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -726,13 +727,13 @@ func getHandlerUpdateFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		c.JSON(http.StatusOK, convFilter(updated_f))
+		c.JSON(http.StatusOK, updated_f.ConvertExternal())
 	}
 }
 
 func getHandlerDeleteFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		var f Filter
+		var f external.Filter
 		if err := c.ShouldBindJSON(&f); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -769,7 +770,7 @@ func getHandlerGetSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		c.IndentedJSON(http.StatusOK, convSource(src))
+		c.IndentedJSON(http.StatusOK, src.ConvertExternal())
 	}
 }
 
@@ -782,7 +783,7 @@ func getHandlerBindFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		var f Filter
+		var f external.Filter
 		if err := c.ShouldBindJSON(&f); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -805,9 +806,9 @@ func getHandlerBindFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		ret_fs := []*Filter{}
+		ret_fs := []*external.Filter{}
 		for _, f := range fs {
-			ret_fs = append(ret_fs, convFilter(f))
+			ret_fs = append(ret_fs, f.ConvertExternal())
 		}
 		c.IndentedJSON(http.StatusOK, ret_fs)
 	}
@@ -828,9 +829,9 @@ func getHandlerGetFilterOnSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		ret_fs := []*Filter{}
+		ret_fs := []*external.Filter{}
 		for _, f := range fs {
-			ret_fs = append(ret_fs, convFilter(f))
+			ret_fs = append(ret_fs, f.ConvertExternal())
 		}
 		c.IndentedJSON(http.StatusOK, ret_fs)
 	}
@@ -845,7 +846,7 @@ func getHandlerUnBindFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		var f Filter
+		var f external.Filter
 		if err := c.ShouldBindJSON(&f); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -868,9 +869,9 @@ func getHandlerUnBindFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		ret_fs := []*Filter{}
+		ret_fs := []*external.Filter{}
 		for _, f := range fs {
-			ret_fs = append(ret_fs, convFilter(f))
+			ret_fs = append(ret_fs, f.ConvertExternal())
 		}
 		c.IndentedJSON(http.StatusOK, ret_fs)
 	}

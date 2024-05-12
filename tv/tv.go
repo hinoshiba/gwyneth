@@ -13,6 +13,7 @@ import (
 	"github.com/hinoshiba/gwyneth/config"
 	"github.com/hinoshiba/gwyneth/tv/database"
 	"github.com/hinoshiba/gwyneth/structs"
+	"github.com/hinoshiba/gwyneth/filter"
 )
 
 type TimeVortex struct {
@@ -188,21 +189,21 @@ func (self *TimeVortex) RemoveFeedEntry(src_id *structs.Id, article_id *structs.
 	return self.db.RemoveFeedEntry(src_id, article_id)
 }
 
-func (self *TimeVortex) AddAction(name string, cmd string) (*structs.Action, error) {
+func (self *TimeVortex) AddAction(name string, cmd string) (*filter.Action, error) {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
 	return self.db.AddAction(name, cmd)
 }
 
-func (self *TimeVortex) GetAction(id *structs.Id) (*structs.Action, error) {
+func (self *TimeVortex) GetAction(id *structs.Id) (*filter.Action, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
 	return self.db.GetAction(id)
 }
 
-func (self *TimeVortex) GetActions() ([]*structs.Action, error) {
+func (self *TimeVortex) GetActions() ([]*filter.Action, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
@@ -216,28 +217,28 @@ func (self *TimeVortex) DeleteAction(id *structs.Id) error {
 	return self.db.DeleteAction(id)
 }
 
-func (self *TimeVortex) AddFilter(title string, regex_title bool, body string, regex_body bool, action_id *structs.Id) (*structs.Filter, error) {
+func (self *TimeVortex) AddFilter(title string, regex_title bool, body string, regex_body bool, action_id *structs.Id) (*filter.Filter, error) {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
 	return self.db.AddFilter(title, regex_title, body, regex_body, action_id)
 }
 
-func (self *TimeVortex) UpdateFilterAction(id *structs.Id, action_id *structs.Id) (*structs.Filter, error) {
+func (self *TimeVortex) UpdateFilterAction(id *structs.Id, action_id *structs.Id) (*filter.Filter, error) {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
 	return self.db.UpdateFilterAction(id, action_id)
 }
 
-func (self *TimeVortex) GetFilter(id *structs.Id) (*structs.Filter, error) {
+func (self *TimeVortex) GetFilter(id *structs.Id) (*filter.Filter, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
 	return self.db.GetFilter(id)
 }
 
-func (self *TimeVortex) GetFilters() ([]*structs.Filter, error) {
+func (self *TimeVortex) GetFilters() ([]*filter.Filter, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
@@ -265,7 +266,7 @@ func (self *TimeVortex) UnBindFilter(src_id *structs.Id, f_id *structs.Id) error
 	return self.db.UnBindFilter(src_id, f_id)
 }
 
-func (self *TimeVortex) GetFilterOnSource(src_id *structs.Id) ([]*structs.Filter, error) {
+func (self *TimeVortex) GetFilterOnSource(src_id *structs.Id) ([]*filter.Filter, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
