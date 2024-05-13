@@ -22,7 +22,7 @@
         <button onclick="addSource()">Add</button>
     </div>
     <hr>
-    <table id="sourcesTable">
+    <table border="1" id="sourcesTable">
         <thead>
             <tr>
                 <th>ID</th>
@@ -91,6 +91,8 @@
         }
 
         function deleteSource(id) {
+            if (!(confirm("Are you sure you want to delete?"))) {return;};
+
             fetch(`./api/source`, {
                 method: 'DELETE',
                 headers: {

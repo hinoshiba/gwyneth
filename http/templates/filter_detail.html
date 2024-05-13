@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+    <h1 style="color: rebeccapurple;"><a href="../">{{.message}}</a></h1>
+    <h1 style="color: rebeccapurple;"><a href="./">Filters</a></h1>
+    <hr>
+    <h1>Filter Detail</h1>
+    <table border="1" id="filtersTable">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>TitleRegex</th>
+                <th>Body</th>
+                <th>BodyRegex</th>
+            </tr>
+        </thead>
+        <tbody id="filtersTableBody"></tbody>
+    </table>
+    <label for="action">Action:</label>
+    <select id="action"></select>
+    <button id="action_btn">Update</button>
+    <hr>
+    <h1>Sources</h1>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Enable</th>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Value</th>
+                <th>Type</th>
+            </tr>
+        </thead>
+        <tbody id="SourcesTableBody"></tbody>
+    </table>
+    <hr>
+    <script>
+        function fetchSources() {
+            fetch('../api/source', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                const tableBody = document.getElementById('SourcesTableBody');
+                tableBody.innerHTML = '';
+                data.forEach(src => {
+                    const row = document.createElement('tr');
+
+                    fetch('../api/source/'+src.id+'/filter', {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(filters => {
+                        let check_clm = `<td><input type="checkbox" onchange="Check(this, '${src.id}')"/></td>`;
+                        filters.forEach(filter => {
+                            if (filter.id != {{.filter_id}}) {
+                                return;
+                            }
+                            check_clm = `<td><input type="checkbox" onchange="Check(this, '${src.id}')" checked/></td>`;
+                        })
+
+                        row.innerHTML = `
+                            ${check_clm}
+                            <td>${src.id}</td>
+                            <td>${src.title}</td>
+                            <td>${src.value}</td>
+                            <td>${src.type.name}</td>
+                        `;
+                        tableBody.appendChild(row);
+                    })
+                });
+            })
+            .catch(error => console.error('Error fetching sources:', error));
+        }
+
+        function Check(checkbox, id) {
+            if (checkbox.checked) {
+                fetch('../api/source/'+id+'/filter', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: '{"id": "{{.filter_id}}" }',
+                })
+                .then(response => {
+                    if (!(response.ok)) {
+                        console.error('Failed to delete filter');
+                        checkbox.checked = false;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error deleting filter:', error);
+                    checkbox.checked = false;
+                });
+            } else {
+                fetch('../api/source/'+id+'/filter', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: '{"id": "{{.filter_id}}" }',
+                })
+                .then(response => {
+                    if (!(response.ok)) {
+                        console.error('Failed to delete filter');
+                        checkbox.checked = true;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error deleting filter:', error);
+                    checkbox.checked = true;
+                });
+            }
+        };
+
+        function updateAction() {
+            const action_id = document.getElementById("action").value;
+            fetch('../api/filter', {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: '{"id": "{{.filter_id}}" , "action":{"id":"'+action_id+'"}}',
+            })
+            .then(response => {
+                if (!(response.ok)) {
+                    console.error('Failed to delete filter');
+                    alert('update failed');
+                }
+            })
+            .catch(error => {
+                console.error('Error deleting filter:', error);
+                alert('update failed');
+            });
+        };
+
+        function fetchFilter() {
+            fetch('../api/filter?id={{.filter_id}}', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                const tableBody = document.getElementById('filtersTableBody');
+                tableBody.innerHTML = ''; // Clear existing table data
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                <td>${data[0].title.value}</td>
+                <td>${data[0].title.regex}</td>
+                <td>${data[0].body.value}</td>
+                <td>${data[0].body.regex}</td>
+                `
+                tableBody.appendChild(row);
+
+                fetch('../api/action', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(action => {
+                    const selectType = document.getElementById('action');
+                    selectType.innerHTML = '';
+                    action.forEach(action => {
+                        const option = document.createElement('option');
+                        option.value = action.id;
+                        option.text = action.name;
+                        if (action.id == data[0].action.id) {
+                            option.selected = true;
+                        }
+                        selectType.appendChild(option);
+                    });
+                })
+            })
+            .catch(error => console.error('Error fetching action:', error));
+        }
+
+        window.onload = function () {
+            fetchSources();
+            fetchFilter();
+            const action_btn = document.getElementById('action_btn');
+            action_btn.onclick = updateAction;
+        };
+    </script>
+</body>
+</html>

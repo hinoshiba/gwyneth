@@ -33,7 +33,8 @@ type Gwyneth struct {
 	new_src       *noticer
 	update_filter *noticer
 
-	artcl_ch chan *structs.Article
+	artcl_ch     chan *structs.Article
+	do_filter_ch chan *structs.Article
 
 	default_source_type map[string]struct{}
 }
@@ -72,6 +73,7 @@ func (self *Gwyneth) init() error {
 		return err
 	}
 	go self.run_core(self.msn.New())
+	go self.run_article_recoder(self.msn.New())
 
 	self.new_src.Notice()
 	self.update_filter.Notice()
@@ -82,7 +84,7 @@ func (self *Gwyneth) run_core(msn *task.Mission) {
 	defer msn.Done()
 
 	var msn_clctr *task.Mission
-	var msn_rcdr  *task.Mission
+	var msn_filtr *task.Mission
 	for {
 		select {
 		case <- msn.RecvCancel():
@@ -101,41 +103,34 @@ func (self *Gwyneth) run_core(msn *task.Mission) {
 				}
 			}(msn_clctr)
 		case <- self.update_filter.Recv():
-			if msn_rcdr != nil {
-				msn_rcdr.Cancel()
+			if msn_filtr != nil {
+				msn_filtr.Cancel()
 			}
 
-			msn_rcdr = msn.New()
-			go func(msn_rcdr *task.Mission){
-				defer msn_rcdr.Done()
+			msn_filtr = msn.New()
+			go func(msn_filtr *task.Mission){
+				defer msn_filtr.Done()
 
-				if err := self.run_article_recoder(msn_rcdr.New()); err !=nil {
+				if err := self.run_filter_engine(msn_filtr.New()); err !=nil {
 					slog.Error(fmt.Sprintf("failed: wakeup article recorder: %s", err))
 				}
-			}(msn_rcdr)
+			}(msn_filtr)
 		}
 	}
 }
 
 func (self *Gwyneth) run_article_recoder(msn *task.Mission) error {
 	defer msn.Done()
-	fmt.Println("run article recorder")
 
-	f_buf := make(map[string][]*filter.Filter)
+	slog.Debug("start article_recoder")
 
 	for {
 		select {
 		case <- msn.RecvCancel():
 			return nil
 		case artcl := <- self.artcl_ch:
-			a, err := self.addArticle(artcl.Title(), artcl.Body(), artcl.Link(), artcl.Unixtime(), artcl.Raw(), artcl.Src().Id())
+			added_artcl, err := self.addArticle(artcl.Title(), artcl.Body(), artcl.Link(), artcl.Unixtime(), artcl.Raw(), artcl.Src().Id())
 			if err != nil {
-				/* //debug all do filter
-				if err != errors.ERR_ALREADY_EXIST_ARTICLE {
-					slog.Warn(fmt.Sprintf("failed: addArticle: %s", err))
-					continue
-				}
-				*/
 				if err == errors.ERR_ALREADY_EXIST_ARTICLE {
 					continue
 				}
@@ -143,16 +138,37 @@ func (self *Gwyneth) run_article_recoder(msn *task.Mission) error {
 				continue
 			}
 
-			fs, ok := f_buf[a.Src().Id().String()]
+			select {
+			case <- msn.RecvCancel():
+				return nil
+			case self.do_filter_ch <- added_artcl:
+			}
+		}
+	}
+}
+
+func (self *Gwyneth) run_filter_engine(msn *task.Mission) error {
+	defer msn.Done()
+
+	slog.Debug("start filter engine")
+
+	f_buf := make(map[string][]*filter.Filter)
+
+	for {
+		select {
+		case <- msn.RecvCancel():
+			return nil
+		case artcl := <- self.do_filter_ch:
+			fs, ok := f_buf[artcl.Src().Id().String()]
 			if !ok {
-				new_fs, err := self.getFilterOnSource(a.Src().Id())
+				new_fs, err := self.getFilterOnSource(artcl.Src().Id())
 				if err != nil {
-					slog.Warn(fmt.Sprintf("failed: cannot get filters for '%s': %s", a.Src().Id().String(), err))
+					slog.Warn(fmt.Sprintf("failed: cannot get filters for '%s': %s", artcl.Src().Id().String(), err))
 					continue
 				}
 
 				fs = new_fs
-				f_buf[a.Src().Id().String()] = new_fs
+				f_buf[artcl.Src().Id().String()] = new_fs
 			}
 
 			func (msn *task.Mission) {
@@ -161,10 +177,10 @@ func (self *Gwyneth) run_article_recoder(msn *task.Mission) error {
 				for _, f := range fs {
 					go func(msn *task.Mission, f filter.Filter) {
 						defer msn.Done()
-						if f.IsMatch(a) {
+						if f.IsMatch(artcl) {
 							action := f.Action()
 
-							if err := action.Do(msn.New(), a); err != nil {
+							if err := action.Do(msn.New(), artcl); err != nil {
 								slog.Error(fmt.Sprintf("failed: execute filter: %s", err))
 							}
 						}
@@ -177,6 +193,8 @@ func (self *Gwyneth) run_article_recoder(msn *task.Mission) error {
 
 func (self *Gwyneth) run_rss_collector(msn *task.Mission) error {
 	defer msn.Done()
+
+	slog.Debug("start collector")
 
 	p := task.NewPool(msn.New(), COLLECTOR_RSS_POOL_SIZE)
 	defer p.Close()
@@ -323,6 +341,10 @@ func (self *Gwyneth) AddArticle(title string, body string, link string, utime in
 		if err != errors.ERR_ALREADY_EXIST_ARTICLE {
 			return nil, err
 		}
+	}
+	select {
+	case <- self.msn.RecvCancel():
+	case self.do_filter_ch <- a:
 	}
 	return a, nil
 }

@@ -65,13 +65,13 @@ func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
 	})
 	self.engine.GET("/source_type", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "source_type.html", gin.H{
-			"message": fmt.Sprintf("Welcome to Gwyneth %s", consts.VERSION),
+			"message": fmt.Sprintf("Gwyneth %s", consts.VERSION),
 		})
 
 	})
 	self.engine.GET("/source", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "source.html", gin.H{
-			"message": fmt.Sprintf("Welcome to Gwyneth %s", consts.VERSION),
+			"message": fmt.Sprintf("Gwyneth %s", consts.VERSION),
 		})
 	})
 
@@ -79,20 +79,29 @@ func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
 		src_id := c.Param("id")
 
 		c.HTML(http.StatusOK, "source_detail.html", gin.H{
-			"message": fmt.Sprintf("Welcome to Gwyneth %s", consts.VERSION),
+			"message": fmt.Sprintf("Gwyneth %s", consts.VERSION),
 			"src_id": fmt.Sprintf("%s", src_id),
 		})
 	})
 
 	self.engine.GET("/action", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "action.html", gin.H{
-			"message": fmt.Sprintf("Welcome to Gwyneth %s", consts.VERSION),
+			"message": fmt.Sprintf("Gwyneth %s", consts.VERSION),
 		})
 	})
 
 	self.engine.GET("/filter", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "filter.html", gin.H{
-			"message": fmt.Sprintf("Welcome to Gwyneth %s", consts.VERSION),
+			"message": fmt.Sprintf("Gwyneth %s", consts.VERSION),
+		})
+	})
+
+	self.engine.GET("/filter/:id", func(c *gin.Context) {
+		filter_id := c.Param("id")
+
+		c.HTML(http.StatusOK, "filter_detail.html", gin.H{
+			"message": fmt.Sprintf("Gwyneth %s", consts.VERSION),
+			"filter_id": fmt.Sprintf("%s", filter_id),
 		})
 	})
 
@@ -382,6 +391,7 @@ func getHandlerLookupArticles(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Co
 	return func(c *gin.Context) {
 		title := c.Query("title")
 		body := c.Query("body")
+		src_id_base_s := c.QueryArray("src_id")
 		s_start := c.DefaultQuery("start", "-1")
 		s_end := c.DefaultQuery("end", "-1")
 		s_limit := c.DefaultQuery("limit", "-1")
@@ -406,7 +416,18 @@ func getHandlerLookupArticles(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Co
 			return
 		}
 
-		as, err := g.LookupArticles(title, body, nil, start, end, limit)
+		src_ids := []*structs.Id{}
+		for _, src_id_base := range src_id_base_s {
+			src_id, err := structs.ParseStringId(src_id_base)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("cannot parse src id('%s'): %s", src_id_base, err)})
+				return
+			}
+
+			src_ids = append(src_ids, src_id)
+		}
+
+		as, err := g.LookupArticles(title, body, src_ids, start, end, limit)
 		if err != nil {
 			err_msg := fmt.Sprintf("lookup failed: %s", err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err_msg})

@@ -19,7 +19,7 @@
     </div>
     <hr>
 
-    <table id="sourceTypesTable">
+    <table border="1" id="sourceTypesTable">
         <thead>
             <tr>
                 <th>ID</th>
@@ -60,6 +60,8 @@
         }
 
         function deleteSourceType(id) {
+            if (!(confirm("Are you sure you want to delete?"))) {return;};
+
             fetch(`../api/source_type`, {
                 method: 'DELETE',
                 headers: {
