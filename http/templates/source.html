@@ -6,7 +6,7 @@
     <title>API Source</title>
 </head>
 <body>
-    <h1 style="color: rebeccapurple;"><a href="../">{{.message}}</a></h1>
+    <h1 style="color: rebeccapurple;"><a href="./">{{.message}}</a></h1>
     <hr>
     <h1>Source</h1>
     <div id="addForm">
@@ -78,7 +78,7 @@
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td><a href="./source/${source.id}">${source.id}</a></td>
-                        <td><a href="./api/feed?src_id=${source.id}" target="_blank" rel="noopener noreferrer">feed</a></td>
+                        <td><a href="./api/feed/${source.id}" target="_blank" rel="noopener noreferrer">feed</a></td>
                         <td>${source.title}</td>
                         <td>${source.value}</td>
                         <td>${source.type.name}</td>

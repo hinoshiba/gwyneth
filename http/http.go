@@ -128,9 +128,9 @@ func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
 	self.engine.POST("/api/article", getHandlerAddArticle(g))
 	self.engine.DELETE("/api/article", getHandlerRemoveArticle(g))
 
-	self.engine.GET("/api/feed", getHandlerGetFeed(self.cfg.Feed, g))
-	self.engine.POST("/api/feed", getHandlerPostFeed(self.cfg.Feed, g))
-	self.engine.DELETE("/api/feed", getHandlerDeleteFeed(self.cfg.Feed, g))
+	self.engine.GET("/api/feed/:id", getHandlerGetFeed(self.cfg.Feed, g))
+	self.engine.POST("/api/feed/:id", getHandlerPostFeed(self.cfg.Feed, g))
+	self.engine.DELETE("/api/feed/:id", getHandlerDeleteFeed(self.cfg.Feed, g))
 
 	self.engine.GET("/api/action", getHandlerGetActions(g))
 	self.engine.POST("/api/action", getHandlerAddAction(g))
@@ -440,15 +440,15 @@ func getHandlerLookupArticles(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Co
 
 func getHandlerGetFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		src_id_base := c.Query("src_id")
+		id_base := c.Param("id")
+		src_id, err := structs.ParseStringId(id_base)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		s_limit := c.DefaultQuery("limit", "30")
 		feed_type := c.DefaultQuery("type", cfg.DefaultType)
 
-		src_id, err := structs.ParseStringId(src_id_base)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("cannot parse src id('%s'): %s", src_id_base, err)})
-			return
-		}
 		limit, err := strconv.ParseInt(s_limit, 10, 64)
 		if err != nil {
 			err_msg := fmt.Sprintf("unkown fmt the parameter of limit('%s'): %s", s_limit, err)
@@ -469,6 +469,17 @@ func getHandlerGetFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Context) 
 
 func getHandlerPostFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
+		id_base := c.Param("id")
+		src_id, err := structs.ParseStringId(id_base)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if _, err := g.GetSource(src_id); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("source id is not exist: '%s'", id_base)})
+			return
+		}
+
 		var article external.Article
 		if err := c.ShouldBindJSON(&article); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -479,17 +490,6 @@ func getHandlerPostFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Context)
 		article_id, err := structs.ParseStringId(article.Id)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("cannot parse article id('%s'): %s", article.Id, err)})
-			return
-		}
-
-		src_id, err := structs.ParseStringId(article.Src.Id)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("cannot parse src id('%s'): %s", article.Src.Id, err)})
-			return
-		}
-
-		if _, err := g.GetSource(src_id); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("source id is not exist: '%s'", article.Src.Id)})
 			return
 		}
 
@@ -506,6 +506,17 @@ func getHandlerPostFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Context)
 
 func getHandlerDeleteFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
+		id_base := c.Param("id")
+		src_id, err := structs.ParseStringId(id_base)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if _, err := g.GetSource(src_id); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("source id is not exist: '%s'", id_base)})
+			return
+		}
+
 		var article external.Article
 		if err := c.ShouldBindJSON(&article); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -516,17 +527,6 @@ func getHandlerDeleteFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Contex
 		article_id, err := structs.ParseStringId(article.Id)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("cannot parse article id('%s'): %s", article.Id, err)})
-			return
-		}
-
-		src_id, err := structs.ParseStringId(article.Src.Id)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("cannot parse src id('%s'): %s", article.Src.Id, err)})
-			return
-		}
-
-		if _, err := g.GetSource(src_id); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("source id is not exist: '%s'", article.Src.Id)})
 			return
 		}
 

@@ -49,6 +49,7 @@ func New(msn *task.Mission, cfg *config.Config) (*Gwyneth, error) {
 		msn: msn,
 
 		artcl_ch: make(chan *structs.Article),
+		do_filter_ch: make(chan *structs.Article),
 
 		new_src:       newNoticer(msn.NewCancel()),
 		update_filter: newNoticer(msn.NewCancel()),
