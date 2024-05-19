@@ -1,0 +1,715 @@
+openapi: 3.0.3
+info:
+  title: Gwyneth API
+  description: |-
+    The GwynethAPI allows you to register articles and manage feeds.
+  version: 0.0.1
+externalDocs:
+  description: GitHub
+  url: https://github.com/hinoshiba/gwyneth/
+servers:
+  - url: http://localhost:8000/api
+tags:
+  - name: default
+  - name: source_type
+    description: for source types
+  - name: source
+    description: for article sources
+  - name: article
+    description: for articles
+  - name: feed
+    description: for feed
+  - name: action
+    description: for action for filter
+  - name: filter
+    description: for filter for article
+paths:
+  /ping:
+    get:
+      tags:
+        - default
+      summary: check a response
+      responses:
+        '200':
+          description: A list of sources
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: pong
+  /source_type:
+    get:
+      tags:
+        - source_type
+      summary: Retrieve a list of source types
+      description: Retrieve a list of source types with their details
+      responses:
+        '200':
+          description: A list of source types
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      example: 174dc6ff-45f9-4b82-9131-d9617e4d4f5b
+                    name:
+                      type: string
+                      example: rss
+                    command:
+                      type: string
+                      example: rss
+                    user_create:
+                      type: boolean
+                      example: false
+  /source:
+    get:
+      tags:
+        - source
+      summary: Retrieve a list of sources
+      description: Retrieve a list of sources with their details
+      responses:
+        '200':
+          description: A list of sources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      example: 174dc6ff-45f9-4b82-9131-d9617e4d4f5b
+                    title:
+                      type: string
+                      example: news_title
+                    value:
+                      type: string
+                      example: https://example.com/feedurl
+                    type:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          example: 174dc6ff-45f9-4b82-9131-d9617e4d4f5b
+                        name:
+                          type: string
+                          example: rss
+                        command:
+                          type: string
+                          example: rss
+                        user_create:
+                          type: boolean
+                          example: false
+    post:
+      tags:
+        - source
+      summary: add a source.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  example: news_title
+                value:
+                  type: string
+                  example: https://example.com/feedurl
+                type:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      example: 174dc6ff-45f9-4b82-9131-d9617e4d4f5b
+      responses:
+        '200':
+          description: A list of sources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      example: 174dc6ff-45f9-4b82-9131-d9617e4d4f5b
+                    title:
+                      type: string
+                      example: news_title
+                    value:
+                      type: string
+                      example: https://example.com/feedurl
+                    type:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          example: 174dc6ff-45f9-4b82-9131-d9617e4d4f5b
+                        name:
+                          type: string
+                          example: rss
+                        command:
+                          type: string
+                          example: rss
+                        user_create:
+                          type: boolean
+                          example: true
+    delete:
+      tags:
+        - source
+      summary: Delete a source.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  example: 174dc6ff-45f9-4b82-9131-d9617e4d4f5b
+      responses:
+        '200':
+          description: A list of sources
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: 174dc6ff-45f9-4b82-9131-d9617e4d4f5b
+  /article:
+    get:
+      tags:
+        - article
+      summary: Retrieve a list of article
+      description: Retrieve a list of article.
+      parameters:
+        - in: query
+          name: title
+          description: Text included in the title.
+          schema:
+            type: string
+        - in: query
+          name: body
+          description: Text included in the body.
+          schema:
+            type: string
+        - in: query
+          name: src_id
+          description: Target source IDs.
+          schema:
+            type: array
+            items:
+              type: string
+        - in: query
+          name: start
+          description: Start time unixtime.
+          schema:
+            type: integer
+        - in: query
+          name: end
+          description: Start time unixtime.
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          description: Maximum response size (default is 30).
+          schema:
+            type: integer
+        - in: query
+          name: type
+          description: Responding Type.( rss / atom / json )
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A Feed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        title:
+                          type: string
+                          example: new news 01
+                        body:
+                          type: string
+                          example: news description
+                        src:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              example: 13b46d3e-1612-4224-8865-a5b449bcbc61
+                        link:
+                          type: string
+                          example: http://example.com/rss
+                        raw:
+                          type: string
+                          example: the raw data of article
+                        timestamp: 
+                          type: integer
+                          example: 1710933677
+    post:
+      tags:
+        - article
+      summary: add a article.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  example: new news 01
+                body:
+                  type: string
+                  example: news description
+                src:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      example: 13b46d3e-1612-4224-8865-a5b449bcbc61
+                link:
+                  type: string
+                  example: http://example.com/rss
+                raw:
+                  type: string
+                  example: the raw data of article
+                timestamp: 
+                  type: integer
+                  example: 1710933677
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  title:
+                    type: string
+                    example: new news 01
+                  body:
+                    type: string
+                    example: news description
+                  src:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        example: 13b46d3e-1612-4224-8865-a5b449bcbc61
+                  link:
+                    type: string
+                    example: http://example.com/rss
+                  raw:
+                    type: string
+                    example: the raw data of article
+                  timestamp: 
+                    type: integer
+                    example: 1710933677
+    delete:
+      tags:
+        - article
+      summary: Delete a article.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  example: 174dc6ff-45f9-4b82-9131-d9617e4d4f5b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: 174dc6ff-45f9-4b82-9131-d9617e4d4f5b
+  /feed/{feedId}:
+    get:
+      tags:
+        - feed
+      summary: Retrieve a list of article
+      description: Retrieve a list of article.
+      parameters:
+        - in: path
+          name: feedId
+          description: Feed ID. same as source ID.
+          schema:
+            type: string
+          required: true
+        - in: query
+          name: limit
+          description: Maximum response size (default is 30).
+          schema:
+            type: integer
+        - in: query
+          name: type
+          description: Responding Type.( rss / atom / json )
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A Feed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        title:
+                          type: string
+                          example: new news 01
+                        body:
+                          type: string
+                          example: news description
+                        src:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              example: 13b46d3e-1612-4224-8865-a5b449bcbc61
+                        link:
+                          type: string
+                          example: http://example.com/rss
+                        raw:
+                          type: string
+                          example: the raw data of article
+                        timestamp: 
+                          type: integer
+                          example: 1710933677
+    post:
+      tags:
+        - feed
+      summary: bind article on the feed.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  example: 174dc6ff-45f9-4b82-9131-d9617e4d4f5b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  title:
+                    type: string
+                    example: new news 01
+                  body:
+                    type: string
+                    example: news description
+                  src:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        example: 13b46d3e-1612-4224-8865-a5b449bcbc61
+                  link:
+                    type: string
+                    example: http://example.com/rss
+                  raw:
+                    type: string
+                    example: the raw data of article
+                  timestamp: 
+                    type: integer
+                    example: 1710933677
+  /action:
+    get:
+      tags:
+        - action
+      summary: Retrieve a list of action
+      description: Retrieve a list of action.
+      responses:
+        '200':
+          description: A Feed.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      example: 13b46d3e-1612-4224-8865-a5b449bcbc61
+                    name:
+                      type: string
+                      example: my script
+                    command:
+                      type: string
+                      example: ./script.sh
+    post:
+      tags:
+        - action
+      summary: add a action.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: my script
+                command:
+                  type: string
+                  example: ./script.sh
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: 13b46d3e-1612-4224-8865-a5b449bcbc61
+                  name:
+                    type: string
+                    example: my script
+                  command:
+                    type: string
+                    example: ./script.sh
+    delete:
+      tags:
+        - action
+      summary: Delete a action.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  example: 174dc6ff-45f9-4b82-9131-d9617e4d4f5b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: 174dc6ff-45f9-4b82-9131-d9617e4d4f5b
+  /filter:
+    get:
+      tags:
+        - filter
+      summary: Retrieve a list of action
+      description: Retrieve a list of action.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      id: 174dc6ff-45f9-4b82-9131-d9617e4d4f5b
+                    title:
+                      type: object
+                      properties:
+                        value:
+                          type: string
+                          example: .*
+                        regex:
+                          type: boolean
+                          example: true
+                    body:
+                      type: object
+                      properties:
+                        value:
+                          type: string
+                          example: .*
+                        regex:
+                          type: boolean
+                          example: true
+                    action:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          example: 13b46d3e-1612-4224-8865-a5b449bcbc61
+                        name:
+                          type: string
+                          example: my script
+                        command:
+                          type: string
+                          example: ./script.sh
+    post:
+      tags:
+        - filter
+      summary: add a action.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: object
+                  properties:
+                    value:
+                      type: string
+                      example: .*
+                    regex:
+                      type: boolean
+                      example: true
+                body:
+                  type: object
+                  properties:
+                    value:
+                      type: string
+                      example: .*
+                    regex:
+                      type: boolean
+                      example: true
+                action:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      example: 13b46d3e-1612-4224-8865-a5b449bcbc61
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    id: 174dc6ff-45f9-4b82-9131-d9617e4d4f5b
+                  title:
+                    type: object
+                    properties:
+                      value:
+                        type: string
+                        example: .*
+                      regex:
+                        type: boolean
+                        example: true
+                  body:
+                    type: object
+                    properties:
+                      value:
+                        type: string
+                        example: .*
+                      regex:
+                        type: boolean
+                        example: true
+                  action:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        example: 13b46d3e-1612-4224-8865-a5b449bcbc61
+                      name:
+                        type: string
+                        example: my script
+                      command:
+                        type: string
+                        example: ./script.sh
+    patch:
+      tags:
+        - filter
+      summary: update action at filter.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  example: 174dc6ff-45f9-4b82-9131-d9617e4d4f5b
+                action:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      example: 13b46d3e-1612-4224-8865-a5b449bcbc61
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    id: 174dc6ff-45f9-4b82-9131-d9617e4d4f5b
+                  title:
+                    type: object
+                    properties:
+                      value:
+                        type: string
+                        example: .*
+                      regex:
+                        type: boolean
+                        example: true
+                  body:
+                    type: object
+                    properties:
+                      value:
+                        type: string
+                        example: .*
+                      regex:
+                        type: boolean
+                        example: true
+                  action:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        example: 13b46d3e-1612-4224-8865-a5b449bcbc61
+                      name:
+                        type: string
+                        example: my script
+                      command:
+                        type: string
+                        example: ./script.sh
+    delete:
+      tags:
+        - filter
+      summary: Delete a filter.
+      requestBody:
+

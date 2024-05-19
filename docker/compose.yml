@@ -23,4 +23,12 @@ services:
     user: mysql
     restart: always
     stop_grace_period: 1m
+  swagger:
+    image: swaggerapi/swagger-ui
+    volumes:
+      - ./etc/gwyneth_swagger.yml:/usr/share/nginx/html/gwyneth.yml
+    environment:
+      API_URL: gwyneth.yml
+    ports:
+      - "127.0.0.1:8001:8080"
 
