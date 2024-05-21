@@ -34,7 +34,7 @@
 
     <script>
         function fetchSourceTypes() {
-            fetch('../api/source_type', {
+            fetch('./api/source_type', {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json'
@@ -62,7 +62,7 @@
         function deleteSourceType(id) {
             if (!(confirm("Are you sure you want to delete?"))) {return;};
 
-            fetch(`../api/source_type`, {
+            fetch(`./api/source_type`, {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json'
@@ -83,7 +83,7 @@
             const name = document.getElementById('name').value;
             const command = document.getElementById('command').value;
 
-            fetch('../api/source_type', {
+            fetch('./api/source_type', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

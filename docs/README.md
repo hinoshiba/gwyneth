@@ -29,9 +29,9 @@ make
 ```
 
 * gwyneth
-	* http://localhost:8000/
+	* http://localhost:8000/gwyneth/
 * swagger
-	* http://localhost:8001/
+	* http://localhost:8000/swagger/
 
 
 ## Settings [sample](../docker/etc/gwyneth.yaml)

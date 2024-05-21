@@ -8,7 +8,7 @@ externalDocs:
   description: GitHub
   url: https://github.com/hinoshiba/gwyneth/
 servers:
-  - url: http://localhost:8000/api
+  - url: http://localhost:8000/gwyneth/api
 tags:
   - name: default
   - name: source_type
