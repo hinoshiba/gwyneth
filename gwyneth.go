@@ -172,7 +172,7 @@ func (self *Gwyneth) run_filter_engine(msn *task.Mission) error {
 				f_buf[artcl.Src().Id().String()] = new_fs
 			}
 
-			func (msn *task.Mission) {
+			go func (msn *task.Mission, artcl *structs.Article) {
 				defer msn.Done()
 
 				for _, f := range fs {
@@ -187,7 +187,7 @@ func (self *Gwyneth) run_filter_engine(msn *task.Mission) error {
 						}
 					}(msn.New(), *f)
 				}
-			}(msn.New())
+			}(msn.New(), artcl)
 		}
 	}
 }

@@ -102,6 +102,7 @@ func (self *Action) Do(msn *task.Mission, artcl *structs.Article) error {
 	if err != nil {
 		return err
 	}
+	stdin.Close()
 
 	if err := cmd.Wait(); err != nil {
 		if cmd.Process != nil {
