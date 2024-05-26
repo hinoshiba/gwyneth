@@ -564,8 +564,6 @@ func (self *Session) addFeed(src_id *structs.Id, article_id *structs.Id) error {
 }
 
 func (self *Session) query4article(q string, args ...any) ([]*structs.Article, error) {
-	fmt.Println(q)
-	fmt.Println(args)
 	rows, err := self.db.Query(q, args...)
 	if err != nil {
 		return nil, err

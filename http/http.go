@@ -63,12 +63,19 @@ func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
 			"message": fmt.Sprintf("Welcome to Gwyneth %s", consts.VERSION),
 		})
 	})
+
+	self.engine.GET("/search", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "search.html", gin.H{
+			"message": fmt.Sprintf("Gwyneth %s", consts.VERSION),
+		})
+	})
+
 	self.engine.GET("/source_type", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "source_type.html", gin.H{
 			"message": fmt.Sprintf("Gwyneth %s", consts.VERSION),
 		})
-
 	})
+
 	self.engine.GET("/source", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "source.html", gin.H{
 			"message": fmt.Sprintf("Gwyneth %s", consts.VERSION),
@@ -131,6 +138,7 @@ func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
 	self.engine.GET("/api/feed/:id", getHandlerGetFeed(self.cfg.Feed, g))
 	self.engine.POST("/api/feed/:id", getHandlerPostFeed(self.cfg.Feed, g))
 	self.engine.DELETE("/api/feed/:id", getHandlerDeleteFeed(self.cfg.Feed, g))
+	self.engine.POST("/api/feed/:id/refilter", getHandlerReFilter(g))
 
 	self.engine.GET("/api/action", getHandlerGetActions(g))
 	self.engine.POST("/api/action", getHandlerAddAction(g))
@@ -392,11 +400,18 @@ func getHandlerLookupArticles(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Co
 		s_limit := c.DefaultQuery("limit", "30")
 		feed_type := c.DefaultQuery("type", cfg.DefaultType)
 
+		if s_start == "" {
+			s_start = "-1"
+		}
 		start, err := strconv.ParseInt(s_start, 10, 64)
 		if err != nil {
 			err_msg := fmt.Sprintf("unkown fmt the parameter of start('%s'): %s", s_start, err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err_msg})
 			return
+		}
+
+		if s_end == "" {
+			s_end = "-1"
 		}
 		end, err := strconv.ParseInt(s_end, 10, 64)
 		if err != nil {
@@ -787,6 +802,36 @@ func getHandlerGetSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 		}
 
 		c.IndentedJSON(http.StatusOK, src.ConvertExternal())
+	}
+}
+
+func getHandlerReFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		id_base := c.Param("id")
+		id, err := structs.ParseStringId(id_base)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		slog.Debug(fmt.Sprintf("ReFilter: request is '%v'", id))
+
+		var json_data struct {
+			Limit int `json:"limit"`
+		}
+		if err := c.ShouldBindJSON(&json_data); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		limit := 50
+		if json_data.Limit > 0 {
+			limit = json_data.Limit
+		}
+		if err := g.ReFilter(id, int64(limit)); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		}
+
+		c.JSON(http.StatusOK, gin.H{})
 	}
 }
 

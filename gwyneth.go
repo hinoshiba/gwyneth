@@ -24,6 +24,7 @@ import (
 
 const (
 	COLLECTOR_RSS_POOL_SIZE = 10
+	FILTER_ACTION_POOL_SIZE = 10
 )
 
 type Gwyneth struct {
@@ -155,6 +156,9 @@ func (self *Gwyneth) run_filter_engine(msn *task.Mission) error {
 
 	f_buf := make(map[string][]*filter.Filter)
 
+	p := task.NewPool(msn.New(), FILTER_ACTION_POOL_SIZE)
+	defer p.Close()
+
 	for {
 		select {
 		case <- msn.RecvCancel():
@@ -179,11 +183,7 @@ func (self *Gwyneth) run_filter_engine(msn *task.Mission) error {
 					go func(msn *task.Mission, f filter.Filter) {
 						defer msn.Done()
 						if f.IsMatch(artcl) {
-							action := f.Action()
-
-							if err := action.Do(msn.New(), artcl); err != nil {
-								slog.Error(fmt.Sprintf("failed: execute filter: %s", err))
-							}
+							p.Do(action_filter, msn.New(), f.Action(), artcl)
 						}
 					}(msn.New(), *f)
 				}
@@ -547,6 +547,44 @@ func (self *Gwyneth) GetSourceWithEnabledFilter(f_id *structs.Id) ([]*structs.So
 
 func (self *Gwyneth) getSourceWithEnabledFilter(f_id *structs.Id) ([]*structs.Source, error) {
 	return self.tv.GetSourceWithEnabledFilter(f_id)
+}
+
+func (self *Gwyneth) ReFilter(src_id *structs.Id, limit int64) error {
+	articles, err := self.getFeed(src_id, limit)
+	if err != nil {
+		return err
+	}
+
+	func (msn *task.Mission) {
+		defer msn.Done()
+
+		for _, article := range articles {
+			go func (msn *task.Mission, article *structs.Article) {
+				defer msn.Done()
+
+				select {
+				case <- msn.RecvCancel():
+				case self.do_filter_ch <- article:
+				}
+			}(msn.New(), article)
+		}
+	}(self.msn.New())
+	return nil
+}
+
+func action_filter(msn *task.Mission, args ...any) {
+	defer msn.Done()
+
+	action := args[0].(*filter.Action)
+	artcl := args[1].(*structs.Article)
+
+	if task.IsCanceled(msn) {
+		slog.Info(fmt.Sprintf("the filter's action is canceld"))
+		return
+	}
+	if err := action.Do(msn.New(), artcl); err != nil {
+		slog.Error(fmt.Sprintf("failed: execute filter: %s", err))
+	}
 }
 
 func rss_collector(msn *task.Mission, args ...any) {

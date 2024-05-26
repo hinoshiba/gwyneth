@@ -73,17 +73,34 @@ func (self *Action) Do(msn *task.Mission, artcl *structs.Article) error {
 	if err != nil {
 		return err
 	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
 
 	output := ""
-	scanner := bufio.NewScanner(stdout)
+	stdout_scanner := bufio.NewScanner(stdout)
 	go func(msn *task.Mission) {
 		defer msn.Done()
 
-		for scanner.Scan() {
+		for stdout_scanner.Scan() {
 			if task.IsCanceled(msn) {
 				return
 			}
-			output += fmt.Sprintf("%s\n", scanner.Text())
+			output += fmt.Sprintf("%s\n", stdout_scanner.Text())
+		}
+	}(msn.New())
+
+	errout := ""
+	stderr_scanner := bufio.NewScanner(stderr)
+	go func(msn *task.Mission) {
+		defer msn.Done()
+
+		for stderr_scanner.Scan() {
+			if task.IsCanceled(msn) {
+				return
+			}
+			errout += fmt.Sprintf("%s\n", stderr_scanner.Text())
 		}
 	}(msn.New())
 
@@ -109,8 +126,8 @@ func (self *Action) Do(msn *task.Mission, artcl *structs.Article) error {
 			cmd.Process.Signal(syscall.SIGKILL)
 		}
 
-		return err
+		return fmt.Errorf("%s: %s", err, errout)
 	}
-	slog.Debug(fmt.Sprintf("%s successed: %s", self.cmd, output))
+	slog.Debug(fmt.Sprintf("%s successed: %s, %s", self.cmd, output, errout))
 	return nil
 }

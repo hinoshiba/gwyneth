@@ -409,6 +409,13 @@ paths:
       tags:
         - feed
       summary: bind article on the feed.
+      parameters:
+        - in: path
+          name: feedId
+          description: Feed ID. same as source ID.
+          schema:
+            type: string
+          required: true
       requestBody:
         content:
           application/json:
@@ -446,6 +453,34 @@ paths:
                   timestamp: 
                     type: integer
                     example: 1710933677
+  /feed/{feedId}/refilter:
+    post:
+      tags:
+        - feed
+      summary: re filter for feed's articles.
+      parameters:
+        - in: path
+          name: feedId
+          description: Feed ID. same as source ID.
+          schema:
+            type: string
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                limit:
+                  type: int
+                  example: 50
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
   /action:
     get:
       tags:
