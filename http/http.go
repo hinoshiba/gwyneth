@@ -389,7 +389,7 @@ func getHandlerLookupArticles(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Co
 		src_id_base_s := c.QueryArray("src_id")
 		s_start := c.DefaultQuery("start", "-1")
 		s_end := c.DefaultQuery("end", "-1")
-		s_limit := c.DefaultQuery("limit", "-1")
+		s_limit := c.DefaultQuery("limit", "30")
 		feed_type := c.DefaultQuery("type", cfg.DefaultType)
 
 		start, err := strconv.ParseInt(s_start, 10, 64)

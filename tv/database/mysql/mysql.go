@@ -472,12 +472,12 @@ func (self *Session) LookupArticles(t_kw string, b_kw string, src_ids []*structs
 	q := "SELECT id, src_id, title, body, link, timestamp, raw FROM article WHERE disable <> 1"
 	args := make([]any, 0)
 	if t_kw != "" {
-		q += " AND LIKE ?"
-		args = append(args, "%" + t_kw + "%")
+		q += " AND title LIKE '%' || ? || '%'"
+		args = append(args, t_kw)
 	}
 	if b_kw != "" {
-		q += " AND LIKE ?"
-		args = append(args, "%" + b_kw + "%")
+		q += " AND body LIKE '%' || ? || '%'"
+		args = append(args, b_kw)
 	}
 	if start > 0 {
 		q += " AND timestamp >= ?"
@@ -490,12 +490,15 @@ func (self *Session) LookupArticles(t_kw string, b_kw string, src_ids []*structs
 	if len(src_ids) > 0 {
 		q += " AND src_id IN (?" + strings.Repeat(", ?", len(src_ids) - 1) + ")"
 		for _, src_id := range src_ids {
-			args = append(args, src_id)
+			args = append(args, src_id.Value())
 		}
 	}
+
+	q += " LIMIT ?"
 	if limit > 0 {
-		q += " LIMIT ?"
 		args = append(args, limit)
+	} else {
+		args = append(args, 30)
 	}
 
 	return self.query4article(q, args...)
@@ -561,6 +564,8 @@ func (self *Session) addFeed(src_id *structs.Id, article_id *structs.Id) error {
 }
 
 func (self *Session) query4article(q string, args ...any) ([]*structs.Article, error) {
+	fmt.Println(q)
+	fmt.Println(args)
 	rows, err := self.db.Query(q, args...)
 	if err != nil {
 		return nil, err
