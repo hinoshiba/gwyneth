@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 )
 
@@ -392,13 +393,27 @@ func getHandlerRemoveArticle(g *gwyneth.Gwyneth) func(*gin.Context) {
 
 func getHandlerLookupArticles(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		title := c.Query("title")
-		body := c.Query("body")
+		title_urlencode := c.Query("title")
+		body_urlencode := c.Query("body")
 		src_id_base_s := c.QueryArray("src_id")
 		s_start := c.DefaultQuery("start", "-1")
 		s_end := c.DefaultQuery("end", "-1")
 		s_limit := c.DefaultQuery("limit", "30")
 		feed_type := c.DefaultQuery("type", cfg.DefaultType)
+
+		title, err := url.QueryUnescape(title_urlencode)
+		if err != nil {
+			err_msg := fmt.Sprintf("cannot parse title ('%s'): %s", title_urlencode, err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err_msg})
+			return
+		}
+
+		body, err := url.QueryUnescape(body_urlencode)
+		if err != nil {
+			err_msg := fmt.Sprintf("cannot parse body ('%s'): %s", body_urlencode, err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err_msg})
+			return
+		}
 
 		if s_start == "" {
 			s_start = "-1"

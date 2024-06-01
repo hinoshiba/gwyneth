@@ -471,14 +471,21 @@ func (self *Session) LookupArticles(t_kw string, b_kw string, src_ids []*structs
 
 	q := "SELECT id, src_id, title, body, link, timestamp, raw FROM article WHERE disable <> 1"
 	args := make([]any, 0)
-	if t_kw != "" {
-		q += " AND title LIKE '%' || ? || '%'"
+	if t_kw != "" && b_kw != "" {
+		q += " AND (title LIKE CONCAT('%', ?, '%') OR body LIKE CONCAT('%', ?, '%'))"
 		args = append(args, t_kw)
-	}
-	if b_kw != "" {
-		q += " AND body LIKE '%' || ? || '%'"
 		args = append(args, b_kw)
+	} else {
+		if t_kw != "" {
+			q += " AND title LIKE CONCAT('%', ?, '%')"
+			args = append(args, t_kw)
+		}
+		if b_kw != "" {
+			q += " AND body LIKE CONCAT('%', ?, '%')"
+			args = append(args, b_kw)
+		}
 	}
+
 	if start > 0 {
 		q += " AND timestamp >= ?"
 		args = append(args, start)
@@ -500,6 +507,8 @@ func (self *Session) LookupArticles(t_kw string, b_kw string, src_ids []*structs
 	} else {
 		args = append(args, 30)
 	}
+
+	slog.Debug(fmt.Sprintf("%s, %v", q, args))
 
 	return self.query4article(q, args...)
 }

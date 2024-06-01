@@ -8,27 +8,28 @@
 function submit_form() {
 	const form = document.feedform;
 
-	const startDate = form.elements["start_date"].value;
-	const endDate = form.elements["end_date"].value;
-
-	const startUnixTime = Math.floor(new Date(startDate).getTime() / 1000);
-	const endUnixTime = Math.floor(new Date(endDate).getTime() / 1000);
-
-	if (!form.elements["start"]) {
-		const startUnixInput = document.createElement("input");
-		startUnixInput.type = "hidden";
-		startUnixInput.name = "start";
-		form.appendChild(startUnixInput);
+	if (form.elements["start_data"]) {
+		const startDate = form.elements["start_date"].value;
+		if (!(startDate == "")) {
+			const startUnixTime = Math.floor(new Date(startDate).getTime() / 1000);
+			const startUnixInput = document.createElement("input");
+			startUnixInput.name = "start";
+			form.appendChild(startUnixInput);
+			form.elements["start"].value = startUnixTime;
+		}
 	}
-	form.elements["start"].value = startUnixTime;
 
-	if (!form.elements["end"]) {
-		const endUnixInput = document.createElement("input");
-		endUnixInput.type = "hidden";
-		endUnixInput.name = "end";
-		form.appendChild(endUnixInput);
+	if (form.elements["end_date"]) {
+		const endDate = form.elements["end_date"].value;
+		if (!(endDate == "")) {
+			const endUnixTime = Math.floor(new Date(endDate).getTime() / 1000);
+			const endUnixInput = document.createElement("input");
+			endUnixInput.type = "hidden";
+			endUnixInput.name = "end";
+			form.appendChild(endUnixInput);
+			form.elements["end"].value = endUnixTime;
+		}
 	}
-	form.elements["end"].value = endUnixTime;
 
 	form.action = "./api/article";
 	form.method = "get";
