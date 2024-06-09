@@ -508,6 +508,8 @@ func (self *Session) LookupArticles(t_kw string, b_kw string, src_ids []*structs
 		args = append(args, 30)
 	}
 
+	q += "ORDER BY timestamp DESC"
+
 	slog.Debug(fmt.Sprintf("%s, %v", q, args))
 
 	return self.query4article(q, args...)
