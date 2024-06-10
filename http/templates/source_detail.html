@@ -9,9 +9,35 @@
     <h1 style="color: rebeccapurple;"><a href="../source">Sources</a></h1>
     <hr>
     <h1>Source Detail</h1>
-    <p><a href="../api/feed?src_id={{.src_id}}" target="_blank" rel="noopener noreferrer">Feed URL</a></p>
+    <p><a href="../api/feed/{{.src_id}}" target="_blank" rel="noopener noreferrer">Feed URL</a></p>
     <hr>
     <h1>Filter</h1>
+<script>
+    function refilter() {
+        var options = {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json" // データ形式をJSONに設定
+            },
+            body: JSON.stringify({limit: 100})
+        };
+
+        fetch("../api/feed/{{.src_id}}/refilter", options)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Network response was not ok");
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log(data);
+            })
+            .catch(error => {
+                console.error("There was a problem with the fetch operation:", error);
+            });
+    }
+</script>
+    <button type="button" onclick="refilter()">re filter</button>
     <table border="1">
         <thead>
             <tr>
