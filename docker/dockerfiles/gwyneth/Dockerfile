@@ -1,14 +1,14 @@
-FROM alpine:3.14
-
-RUN apk add bash
+FROM python:3
 
 ADD ./bin/gwyneth /usr/local/bin/gwyneth
 ADD ./http/templates /usr/local/src/http/templates
 ADD ./http/static /usr/local/src/http/static
-ADD ./scripts /var/service/gwyneth/bin
+ADD ./scripts /app/bin
 
-RUN chmod u+x /var/service/gwyneth/bin/*
+RUN chmod u+x /app/bin/*
 
-WORKDIR "/var/service/gwyneth"
+RUN pip3 install requests
+
+WORKDIR "/app/bin"
 
 CMD ["/usr/local/bin/gwyneth", "-c", "/app/gwyneth.yaml"]
