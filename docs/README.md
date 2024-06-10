@@ -149,4 +149,4 @@ id=$(echo "$json_data" | jq -r '.id')
 curl -s -X POST -H 'Content-Type: application/json' -d "{\"id\":\"${id}\"}" http://localhost/gwyneth/api/feed/${ANOTHER_FEED_ID}
 ```
 
-### [Other Samples](./samples/scripts)
+### [Other Samples](../samples/scripts)
