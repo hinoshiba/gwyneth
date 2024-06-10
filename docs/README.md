@@ -89,7 +89,7 @@ curl -s -X POST -H 'Content-Type: application/json' -d ${body} http://localhost/
 You can link an article from SourceB to SourceA. 
 Although the same operation can be performed by creating an article, the entity exists in SourceA because this operation simply links the article to SourceA.  
 
-## Action & Filter
+## Action & Filter `POST /action` and `POST /filter`
 Action is fired if it matches the Filter. If necessary, specify the registration of Filter conditions and enable/disable at Source.  
 The filter can specify a title and a body; it acts as an OR match, so if either one matches, the Action is executed.  
 
@@ -119,7 +119,7 @@ The script specified in action will be passed the following json as standard inp
 
 By using the json, you can manipulate the appropriate Feed by performing any desired process. For example, Slack notifications or re-registration to Gwyneth.  
 
-## Sample: notification to Slack(Incoming Webhooks)
+### Sample: notification to Slack(Incoming Webhooks)
 
 ```bash
 #!/bin/bash
@@ -133,7 +133,7 @@ title=$(echo "$json_data" | jq -r '.title')
 curl -s -X POST -H 'Content-Type: application/json' -d "{\"text\":\"recived new article: ${title}\"}" <YOUR-WEBHOOK-URL>
 ```
 
-## Sample: linking to another Feed on Gwyneth
+### Sample: linking to another Feed on Gwyneth
 
 ```bash
 #!/bin/bash
