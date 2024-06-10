@@ -9,7 +9,7 @@ build:
 	rm -rf ./dockerfiles/gwyneth/http
 	cp -rf ../http ./dockerfiles/gwyneth/http
 	rm -rf ./dockerfiles/gwyneth/scripts
-	cp -rf ../scripts ./dockerfiles/gwyneth/scripts
+	cp -rf ../samples/scripts ./dockerfiles/gwyneth/scripts
 	docker compose build
 
 .PHONY: up

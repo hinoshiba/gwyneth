@@ -1,0 +1,16 @@
+database:
+  host: db
+  port: 3306
+  database: gwyneth
+  user: gwyneth
+  password: password
+http:
+  host: 0.0.0.0
+  port: 80
+feed:
+  title: gwyneth feed
+  description:
+  link: http://localhost:8000/
+  author_name: hinoshiba
+  author_email: hinoshiba@example.com
+  default_type: rss

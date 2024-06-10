@@ -34,7 +34,7 @@ make
 	* http://localhost:8000/swagger/
 
 
-## Settings [sample](../docker/etc/gwyneth.yaml)
+## Settings [samples](../samples/gwyneth.yaml)
 ```
 database:
   host: <database's host>
