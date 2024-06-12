@@ -487,11 +487,11 @@ func (self *Session) LookupArticles(t_kw string, b_kw string, src_ids []*structs
 	}
 
 	if start > 0 {
-		q += " AND timestamp >= ?"
+		q += " AND timestamp >= FROM_UNIXTIME(?)"
 		args = append(args, start)
 	}
 	if end > 0 {
-		q += " AND timestamp <= ?"
+		q += " AND timestamp <= FROM_UNIXTIME(?)"
 		args = append(args, end)
 	}
 	if len(src_ids) > 0 {
@@ -501,14 +501,14 @@ func (self *Session) LookupArticles(t_kw string, b_kw string, src_ids []*structs
 		}
 	}
 
+	q += " ORDER BY timestamp DESC"
+
 	q += " LIMIT ?"
 	if limit > 0 {
 		args = append(args, limit)
 	} else {
 		args = append(args, 30)
 	}
-
-	q += " ORDER BY timestamp DESC"
 
 	slog.Debug(fmt.Sprintf("%s, %v", q, args))
 

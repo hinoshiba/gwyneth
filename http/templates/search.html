@@ -8,7 +8,7 @@
 function submit_form() {
 	const form = document.feedform;
 
-	if (form.elements["start_data"]) {
+	if (form.elements["start_date"]) {
 		const startDate = form.elements["start_date"].value;
 		if (!(startDate == "")) {
 			const startUnixTime = Math.floor(new Date(startDate).getTime() / 1000);
