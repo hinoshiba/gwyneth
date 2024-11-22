@@ -452,9 +452,10 @@ func (self *Session) AddArticle(title string, body string, link string, unixtime
 	}
 
 	id := structs.NewId(nil)
+	timestamp := time.Unix(unixtime, 0)
 	_, err = self.db.ExecContext(self.msn.AsContext(),
-		"INSERT INTO article (id, src_id, title, body, link, timestamp, raw) VALUES (?, ?, ?, ?, ?, FROM_UNIXTIME(?), ?)",
-					id.Value(), src_id.Value(), title, body, link, unixtime, raw)
+		"INSERT INTO article (id, src_id, title, body, link, timestamp, raw) VALUES (?, ?, ?, ?, ?, ?, ?)",
+				id.Value(), src_id.Value(), title, body, link, timestamp, raw)
 	if err != nil {
 		return nil, err
 	}
@@ -488,11 +489,13 @@ func (self *Session) LookupArticles(t_kw string, b_kw string, src_ids []*structs
 
 	if start > 0 {
 		q += " AND timestamp >= FROM_UNIXTIME(?)"
-		args = append(args, start)
+		start_t := time.Unix(start, 0)
+		args = append(args, start_t)
 	}
 	if end > 0 {
 		q += " AND timestamp <= FROM_UNIXTIME(?)"
-		args = append(args, end)
+		end_t := time.Unix(end, 0)
+		args = append(args, end_t)
 	}
 	if len(src_ids) > 0 {
 		q += " AND src_id IN (?" + strings.Repeat(", ?", len(src_ids) - 1) + ")"
@@ -544,7 +547,7 @@ SELECT a.id, f.src_id, a.title, a.body, a.link, a.timestamp, a.raw
 FROM article a
 JOIN feed f ON a.id = f.article_id
 WHERE f.src_id = ? AND a.disable <> 1
-ORDER BY f.timestamp DESC
+ORDER BY a.timestamp DESC
 LIMIT ?
 `
 
