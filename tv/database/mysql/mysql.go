@@ -489,13 +489,11 @@ func (self *Session) LookupArticles(t_kw string, b_kw string, src_ids []*structs
 
 	if start > 0 {
 		q += " AND timestamp >= FROM_UNIXTIME(?)"
-		start_t := time.Unix(start, 0)
-		args = append(args, start_t)
+		args = append(args, start)
 	}
 	if end > 0 {
 		q += " AND timestamp <= FROM_UNIXTIME(?)"
-		end_t := time.Unix(end, 0)
-		args = append(args, end_t)
+		args = append(args, end)
 	}
 	if len(src_ids) > 0 {
 		q += " AND src_id IN (?" + strings.Repeat(", ?", len(src_ids) - 1) + ")"
