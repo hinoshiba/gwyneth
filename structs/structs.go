@@ -147,6 +147,7 @@ func (self *Source) ConvertExternal() *external.Source {
 		Title: self.title,
 		Type: self.src_type.ConvertExternal(),
 		Value: self.val,
+		Pause: self.pause,
 	}
 }
 

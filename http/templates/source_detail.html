@@ -3,13 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const apiUrl = "../api/source/{{.src_id}}";
+            const pauseUrl = apiUrl + "/pause";
+            const resumeUrl = apiUrl + "/resume";
+            const container = document.getElementById("data-container");
+
+            function fetchData() {
+                fetch(apiUrl)
+                    .then(response => response.json())
+                    .then(data => {
+                        container.innerHTML = `
+                            <table border="1" cellspacing="0" cellpadding="5">
+                                <tr><th>Title</th><td>${data.title}</td></tr>
+                                <tr><th>Value(Original)</th><td><a href="${data.value}" target="_blank">${data.value}</a></td></tr>
+                                <tr><th>Pause</th><td>${data.pause ? "Paused" : "Running"}</td></tr>
+                            </table>
+                            <button id="toggle-btn">${data.pause ? "Resume" : "Pause"}</button>
+                        `;
+
+                        document.getElementById("toggle-btn").addEventListener("click", function() {
+                            togglePause(data.pause);
+                        });
+                    })
+                    .catch(error => console.error("Error fetching data:", error));
+            }
+
+            function togglePause(isPaused) {
+                const url = isPaused ? resumeUrl : pauseUrl;
+                fetch(url, { method: "POST" })
+                    .then(response => response.json())
+                    .then(() => fetchData())
+                    .catch(error => console.error("Error toggling pause state:", error));
+            }
+
+            fetchData();
+        });
+    </script>
 </head>
 <body>
     <h1 style="color: rebeccapurple;"><a href="../">{{.message}}</a></h1>
     <h1 style="color: rebeccapurple;"><a href="../source">Sources</a></h1>
     <hr>
     <h1>Source Detail</h1>
-    <p><a href="../api/feed/{{.src_id}}" target="_blank" rel="noopener noreferrer">Feed URL</a></p>
+    <p><a href="../api/feed/{{.src_id}}" target="_blank" rel="noopener noreferrer">Gwyneth Feed URL</a></p>
+    <div id="data-container">Loading...</div>
     <hr>
     <h1>Filter</h1>
 <script>

@@ -12,6 +12,7 @@ type Source struct {
 	Title string      `json:"title"`
 	Type  *SourceType `json:"type"`
 	Value string      `json:"value"`
+	Pause bool        `json:"pause"`
 }
 
 type Article struct {

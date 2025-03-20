@@ -30,6 +30,7 @@
                 <th>Name</th>
                 <th>Value</th>
                 <th>Type</th>
+                <th>Pause</th>
                 <th>Action</th>
             </tr>
         </thead>
@@ -82,6 +83,7 @@
                         <td>${source.title}</td>
                         <td>${source.value}</td>
                         <td>${source.type.name}</td>
+                        <td>${source.pause}</td>
                         <td><button onclick="deleteSource('${source.id}')">Delete</button></td>
                     `;
                     tableBody.appendChild(row);
