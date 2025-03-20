@@ -213,6 +213,9 @@ func (self *Gwyneth) run_rss_collector(msn *task.Mission) error {
 		if !(src.Type().Name() == "rss") {
 			continue
 		}
+		if src.IsPause() {
+			continue
+		}
 
 		tgts = append(tgts, src)
 	}
@@ -327,8 +330,26 @@ func (self *Gwyneth) FindSource(kw string) ([]*structs.Source, error) {
 	return self.tv.FindSource(kw)
 }
 
-func (self *Gwyneth) DeleteSource(id *structs.Id) error {
-	if err := self.tv.DeleteSource(id); err != nil {
+func (self *Gwyneth) RemoveSource(id *structs.Id) error {
+	if err := self.tv.RemoveSource(id); err != nil {
+		return err
+	}
+
+	self.new_src.Notice()
+	return nil
+}
+
+func (self *Gwyneth) PauseSource(id *structs.Id) error {
+	if err := self.tv.PauseSource(id); err != nil {
+		return err
+	}
+
+	self.new_src.Notice()
+	return nil
+}
+
+func (self *Gwyneth) ResumeSource(id *structs.Id) error {
+	if err := self.tv.ResumeSource(id); err != nil {
 		return err
 	}
 

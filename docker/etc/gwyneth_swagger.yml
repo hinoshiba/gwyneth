@@ -453,6 +453,50 @@ paths:
                   timestamp: 
                     type: integer
                     example: 1710933677
+  /source/{sourceId}/pause:
+    post:
+      tags:
+        - source
+      summary: pause data collection
+      parameters:
+        - in: path
+          name: sourceId
+          description: Source ID.
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: success
+  /source/{sourceId}/resume:
+    post:
+      tags:
+        - source
+      summary: resume data collection
+      parameters:
+        - in: path
+          name: sourceId
+          description: Source ID.
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: success
   /feed/{feedId}/refilter:
     post:
       tags:

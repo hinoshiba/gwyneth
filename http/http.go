@@ -125,12 +125,14 @@ func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
 
 	self.engine.GET("/api/source", getHandlerGetSources(g))
 	self.engine.POST("/api/source", getHandlerAddSource(g))
-	self.engine.DELETE("/api/source", getHandlerDeleteSource(g))
+	self.engine.DELETE("/api/source", getHandlerRemoveSource(g))
 
 	self.engine.GET("/api/source/:id", getHandlerGetSource(g))
 	self.engine.POST("/api/source/:id/filter", getHandlerBindFilter(g))
 	self.engine.GET("/api/source/:id/filter", getHandlerGetFilterOnSource(g))
 	self.engine.DELETE("/api/source/:id/filter", getHandlerUnBindFilter(g))
+	self.engine.POST("/api/source/:id/pause", getHandlerPauseSource(g))
+	self.engine.POST("/api/source/:id/resume", getHandlerResumeSource(g))
 
 	self.engine.GET("/api/article", getHandlerLookupArticles(self.cfg.Feed, g))
 	self.engine.POST("/api/article", getHandlerAddArticle(g))
@@ -313,7 +315,7 @@ func getHandlerGetSources(g *gwyneth.Gwyneth) func(*gin.Context) {
 	}
 }
 
-func getHandlerDeleteSource(g *gwyneth.Gwyneth) func(*gin.Context) {
+func getHandlerRemoveSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
 		var src external.Source
 		if err := c.ShouldBindJSON(&src); err != nil {
@@ -326,7 +328,7 @@ func getHandlerDeleteSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		if err := g.DeleteSource(id); err != nil {
+		if err := g.RemoveSource(id); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -817,6 +819,43 @@ func getHandlerGetSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 		}
 
 		c.IndentedJSON(http.StatusOK, src.ConvertExternal())
+	}
+}
+
+func getHandlerPauseSource(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		id_base := c.Param("id")
+		id, err := structs.ParseStringId(id_base)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		if err := g.PauseSource(id); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message": "success",
+		})
+	}
+}
+func getHandlerResumeSource(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		id_base := c.Param("id")
+		id, err := structs.ParseStringId(id_base)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		if err := g.ResumeSource(id); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message": "success",
+		})
 	}
 }
 
