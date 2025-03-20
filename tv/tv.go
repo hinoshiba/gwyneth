@@ -136,15 +136,37 @@ func (self *TimeVortex) getSource(id *structs.Id) (*structs.Source, error) {
 	return self.db.GetSource(id)
 }
 
-func (self *TimeVortex) DeleteSource(id *structs.Id) error {
+func (self *TimeVortex) RemoveSource(id *structs.Id) error {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
-	return self.deleteSource(id)
+	return self.removeSource(id)
 }
 
-func (self *TimeVortex) deleteSource(id *structs.Id) error {
-	return self.db.DeleteSource(id)
+func (self *TimeVortex) removeSource(id *structs.Id) error {
+	return self.db.RemoveSource(id)
+}
+
+func (self *TimeVortex) PauseSource(id *structs.Id) error {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	return self.pauseSource(id)
+}
+
+func (self *TimeVortex) pauseSource(id *structs.Id) error {
+	return self.db.PauseSource(id)
+}
+
+func (self *TimeVortex) ResumeSource(id *structs.Id) error {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	return self.resumeSource(id)
+}
+
+func (self *TimeVortex) resumeSource(id *structs.Id) error {
+	return self.db.ResumeSource(id)
 }
 
 func (self *TimeVortex) AddArticle(title string, body string, link string, utime int64, raw string, src_id *structs.Id) (*structs.Article, error){

@@ -93,6 +93,9 @@ paths:
                     value:
                       type: string
                       example: https://example.com/feedurl
+                    pause:
+                      tpye: bool
+                      example: false
                     type:
                       type: object
                       properties:
@@ -473,6 +476,86 @@ paths:
                 id:
                   type: string
                   example: 174dc6ff-45f9-4b82-9131-d9617e4d4f5b
+  /source/{sourceId}:
+    get:
+      tags:
+        - source
+      summary: get a detail of source
+      parameters:
+        - in: path
+          name: sourceId
+          description: Source ID.
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: 174dc6ff-45f9-4b82-9131-d9617e4d4f5b
+                  title:
+                    type: string
+                    example: news_title
+                  value:
+                    type: string
+                    example: https://example.com/feedurl
+                  pause:
+                    tpye: bool
+                    example: false
+                  type:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        example: 174dc6ff-45f9-4b82-9131-d9617e4d4f5b
+                      name:
+                        type: string
+                        example: rss
+                      command:
+                        type: string
+                        example: rss
+                      user_create:
+                        type: boolean
+                        example: false
+  /source/{sourceId}/pause:
+    post:
+      tags:
+        - source
+      summary: pause data collection
+      parameters:
+        - in: path
+          name: sourceId
+          description: Source ID.
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: success
+  /source/{sourceId}/resume:
+    post:
+      tags:
+        - source
+      summary: resume data collection
+      parameters:
+        - in: path
+          name: sourceId
+          description: Source ID.
+          schema:
+            type: string
+          required: true
       responses:
         '200':
           content:

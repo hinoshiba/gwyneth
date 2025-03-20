@@ -292,7 +292,7 @@ func (self *Session) GetSources() ([]*structs.Source, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
-	rows, err := self.db.Query("SELECT * FROM source")
+	rows, err := self.db.Query("SELECT id, title, type, source, pause FROM source WHERE disable <> 1")
 	if err != nil {
 		return nil, err
 	}
@@ -305,8 +305,9 @@ func (self *Session) GetSources() ([]*structs.Source, error) {
 		var title string
 		var source_type_id_base []byte
 		var source string
+		var pause bool
 
-		err := rows.Scan(&id_base, &title, &source_type_id_base, &source)
+		err := rows.Scan(&id_base, &title, &source_type_id_base, &source, &pause)
 		if err != nil {
 			return nil, err
 		}
@@ -324,7 +325,7 @@ func (self *Session) GetSources() ([]*structs.Source, error) {
 			st_cache[source_type_id.String()] = st
 		}
 
-		srcs = append(srcs, structs.NewSource(id, title, st, source))
+		srcs = append(srcs, structs.NewSource(id, title, st, source, pause))
 	}
 
 	if err := rows.Err(); err != nil {
@@ -337,7 +338,7 @@ func (self *Session) FindSource(kw string) ([]*structs.Source, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
-	rows, err := self.db.Query("SELECT * FROM source WHERE title = ?", kw)
+	rows, err := self.db.Query("SELECT id, title, type, source, pause FROM source WHERE title = ? AND disable <> 1", kw)
 	if err != nil {
 		return nil, err
 	}
@@ -350,8 +351,9 @@ func (self *Session) FindSource(kw string) ([]*structs.Source, error) {
 		var title string
 		var source_type_id_base []byte
 		var source string
+		var pause bool
 
-		err := rows.Scan(&id_base, &title, &source_type_id_base, &source)
+		err := rows.Scan(&id_base, &title, &source_type_id_base, &source, &pause)
 		if err != nil {
 			return nil, err
 		}
@@ -369,7 +371,7 @@ func (self *Session) FindSource(kw string) ([]*structs.Source, error) {
 			st_cache[source_type_id.String()] = st
 		}
 
-		srcs = append(srcs, structs.NewSource(id, title, st, source))
+		srcs = append(srcs, structs.NewSource(id, title, st, source, pause))
 	}
 
 	if err := rows.Err(); err != nil {
@@ -386,7 +388,7 @@ func (self *Session) GetSource(id *structs.Id) (*structs.Source, error) {
 }
 
 func (self *Session) getSource(id *structs.Id) (*structs.Source, error) {
-	rows, err := self.db.Query("SELECT * FROM source WHERE id = ? LIMIT 1", id.Value())
+	rows, err := self.db.Query("SELECT id, title, type, source, pause FROM source WHERE id = ? LIMIT 1", id.Value())
 	if err != nil {
 		return nil, err
 	}
@@ -396,9 +398,10 @@ func (self *Session) getSource(id *structs.Id) (*structs.Source, error) {
 	var title string
 	var source_type_id_base []byte
 	var source string
+	var pause bool
 
 	for rows.Next() {
-		if err = rows.Scan(&id_base, &title, &source_type_id_base, &source); err != nil {
+		if err = rows.Scan(&id_base, &title, &source_type_id_base, &source, &pause); err != nil {
 			return nil, err
 		}
 		id = structs.NewId(id_base)
@@ -412,12 +415,12 @@ func (self *Session) getSource(id *structs.Id) (*structs.Source, error) {
 		if err = rows.Err(); err != nil {
 			return nil, err
 		}
-		return structs.NewSource(id, title, st, source), nil
+		return structs.NewSource(id, title, st, source, pause), nil
 	}
 	return nil, fmt.Errorf("cannot find the source.")
 }
 
-func (self *Session) DeleteSource(id *structs.Id) error {
+func (self *Session) RemoveSource(id *structs.Id) error {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
@@ -426,7 +429,33 @@ func (self *Session) DeleteSource(id *structs.Id) error {
 	}
 
 	_, err := self.db.ExecContext(self.msn.AsContext(),
-		"DELETE FROM source WHERE id = ?", id.Value())
+		"UPDATE source SET disable = 1, pause = 1 WHERE id = ?", id.Value())
+	return err
+}
+
+func (self *Session) PauseSource(id *structs.Id) error {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	if _, err := self.getSource(id); err != nil {
+		return err
+	}
+
+	_, err := self.db.ExecContext(self.msn.AsContext(),
+		"UPDATE source SET pause = 1 WHERE id = ?", id.Value())
+	return err
+}
+
+func (self *Session) ResumeSource(id *structs.Id) error {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	if _, err := self.getSource(id); err != nil {
+		return err
+	}
+
+	_, err := self.db.ExecContext(self.msn.AsContext(),
+		"UPDATE source SET pause = 0 WHERE id = ?", id.Value())
 	return err
 }
 
@@ -544,7 +573,7 @@ func (self *Session) GetFeed(src_id *structs.Id, limit int64) ([]*structs.Articl
 SELECT a.id, f.src_id, a.title, a.body, a.link, a.timestamp, a.raw
 FROM article a
 JOIN feed f ON a.id = f.article_id
-WHERE f.src_id = ? AND a.disable <> 1
+WHERE f.src_id = ? AND a.disable <> 1 AND f.disable <> 1
 ORDER BY a.timestamp DESC
 LIMIT ?
 `

@@ -108,14 +108,16 @@ type Source struct {
 	title    string
 	src_type *SourceType
 	val      string
+	pause    bool
 }
 
-func NewSource(id *Id, title string, src_type *SourceType, val string) *Source {
+func NewSource(id *Id, title string, src_type *SourceType, val string, pause bool) *Source {
 	return &Source {
 		id: id,
 		title: title,
 		src_type: src_type,
 		val: val,
+		pause: pause,
 	}
 }
 
@@ -135,12 +137,17 @@ func (self *Source) Value() string {
 	return self.val
 }
 
+func (self *Source) IsPause() bool {
+	return self.pause
+}
+
 func (self *Source) ConvertExternal() *external.Source {
 	return &external.Source {
 		Id: self.id.String(),
 		Title: self.title,
 		Type: self.src_type.ConvertExternal(),
 		Value: self.val,
+		Pause: self.pause,
 	}
 }
 

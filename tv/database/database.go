@@ -31,7 +31,9 @@ type Session interface {
 	GetSource(*structs.Id) (*structs.Source, error)
 	GetSources() ([]*structs.Source, error)
 	FindSource(string) ([]*structs.Source, error)
-	DeleteSource(*structs.Id) error
+	RemoveSource(*structs.Id) error
+	PauseSource(*structs.Id) error
+	ResumeSource(*structs.Id) error
 
 	AddArticle(string, string, string, int64, string, *structs.Id) (*structs.Article, error)
 	LookupArticles(string, string, []*structs.Id, int64, int64, int64) ([]*structs.Article, error)
