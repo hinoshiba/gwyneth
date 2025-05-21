@@ -1,4 +1,4 @@
-IMG=golang:1.21.6
+IMG=golang:1.23.9
 BUILD_FLGS= -buildvcs=false -tags netgo -installsuffix netgo -ldflags='-extldflags="static"'
 BINS=gwyneth
 
