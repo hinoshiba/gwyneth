@@ -6,12 +6,15 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"strconv"
+	"html/template"
 )
 
 import (
 	"github.com/l4go/task"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/render"
 )
 
 import (
@@ -56,33 +59,65 @@ func (self *Router) Close() error {
 	return nil
 }
 
+func makeRenderHtml(fname string, param *gin.H) *render.HTML {
+	data := gin.H{
+		"Version": consts.VERSION,
+	}
+	if param != nil {
+		for k, v := range *param {
+			data[k] = v
+		}
+	}
+
+	tmpl := loadTemplate(fname)
+	return &render.HTML{
+		Template: tmpl,
+		Name: "contents",
+		Data: data,
+	}
+}
+
+func loadTemplate(fname string) *template.Template {
+	files := []string{
+		"/usr/local/src/http/templates/layout/main.html",
+		filepath.Join("/usr/local/src/http/templates/pages/", fname),
+	}
+
+	tmpl := template.New("").Funcs(template.FuncMap{
+		"eq": func(a, b string) bool { return a == b },
+	})
+	return template.Must(tmpl.ParseFiles(files...))
+}
+
 func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
-	self.engine.LoadHTMLGlob("/usr/local/src/http/templates/*")
 	self.engine.Static("/static", "/usr/local/src/http/static")
+
 	self.engine.GET("/", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "index.html", gin.H{
-			"message": fmt.Sprintf("Welcome to Gwyneth %s", consts.VERSION),
-		})
+		c.Render(http.StatusOK, makeRenderHtml("index.html", nil))
 	})
 
 	self.engine.GET("/search", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "search.html", gin.H{
-			"message": fmt.Sprintf("Gwyneth %s", consts.VERSION),
-		})
+		c.Render(http.StatusOK, makeRenderHtml(
+			"search.html",
+			&gin.H{"Page": "search"},
+		))
 	})
 
 	self.engine.GET("/source_type", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "source_type.html", gin.H{
-			"message": fmt.Sprintf("Gwyneth %s", consts.VERSION),
-		})
+		c.Render(http.StatusOK, makeRenderHtml(
+			"source_type.html",
+			&gin.H{"Page": "source_type"},
+		))
 	})
 
 	self.engine.GET("/source", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "source.html", gin.H{
-			"message": fmt.Sprintf("Gwyneth %s", consts.VERSION),
-		})
+		c.Render(http.StatusOK, makeRenderHtml(
+			"source.html",
+			&gin.H{"Page": "source"},
+		))
 	})
 
+/*
 	self.engine.GET("/source/:id", func(c *gin.Context) {
 		src_id := c.Param("id")
 
@@ -91,19 +126,23 @@ func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
 			"src_id": fmt.Sprintf("%s", src_id),
 		})
 	})
+*/
 
 	self.engine.GET("/action", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "action.html", gin.H{
-			"message": fmt.Sprintf("Gwyneth %s", consts.VERSION),
-		})
+		c.Render(http.StatusOK, makeRenderHtml(
+			"action.html",
+			&gin.H{"Page": "action"},
+		))
 	})
 
 	self.engine.GET("/filter", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "filter.html", gin.H{
-			"message": fmt.Sprintf("Gwyneth %s", consts.VERSION),
-		})
+		c.Render(http.StatusOK, makeRenderHtml(
+			"filter.html",
+			&gin.H{"Page": "filter"},
+		))
 	})
 
+/*
 	self.engine.GET("/filter/:id", func(c *gin.Context) {
 		filter_id := c.Param("id")
 
@@ -112,45 +151,48 @@ func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
 			"filter_id": fmt.Sprintf("%s", filter_id),
 		})
 	})
+*/
 
-	self.engine.GET("/api/ping", func(c *gin.Context) {
+	api := self.engine.Group("/api")
+
+	api.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "pong",
 		})
 	})
 
-	self.engine.GET("/api/source_type", getHandlerGetSourceTypes(g))
-	self.engine.POST("/api/source_type", getHandlerAddSourceType(g))
-	self.engine.DELETE("api/source_type", getHandlerDeleteSourceType(g))
+	api.GET("/source_type", getHandlerGetSourceTypes(g))
+	api.POST("/source_type", getHandlerAddSourceType(g))
+	api.DELETE("source_type", getHandlerDeleteSourceType(g))
 
-	self.engine.GET("/api/source", getHandlerGetSources(g))
-	self.engine.POST("/api/source", getHandlerAddSource(g))
-	self.engine.DELETE("/api/source", getHandlerRemoveSource(g))
+	api.GET("/source", getHandlerGetSources(g))
+	api.POST("/source", getHandlerAddSource(g))
+	api.DELETE("/source", getHandlerRemoveSource(g))
 
-	self.engine.GET("/api/source/:id", getHandlerGetSource(g))
-	self.engine.POST("/api/source/:id/filter", getHandlerBindFilter(g))
-	self.engine.GET("/api/source/:id/filter", getHandlerGetFilterOnSource(g))
-	self.engine.DELETE("/api/source/:id/filter", getHandlerUnBindFilter(g))
-	self.engine.POST("/api/source/:id/pause", getHandlerPauseSource(g))
-	self.engine.POST("/api/source/:id/resume", getHandlerResumeSource(g))
+	api.GET("/source/:id", getHandlerGetSource(g))
+	api.POST("/source/:id/filter", getHandlerBindFilter(g))
+	api.GET("/source/:id/filter", getHandlerGetFilterOnSource(g))
+	api.DELETE("/source/:id/filter", getHandlerUnBindFilter(g))
+	api.POST("/source/:id/pause", getHandlerPauseSource(g))
+	api.POST("/source/:id/resume", getHandlerResumeSource(g))
 
-	self.engine.GET("/api/article", getHandlerLookupArticles(self.cfg.Feed, g))
-	self.engine.POST("/api/article", getHandlerAddArticle(g))
-	self.engine.DELETE("/api/article", getHandlerRemoveArticle(g))
+	api.GET("/article", getHandlerLookupArticles(self.cfg.Feed, g))
+	api.POST("/article", getHandlerAddArticle(g))
+	api.DELETE("/article", getHandlerRemoveArticle(g))
 
-	self.engine.GET("/api/feed/:id", getHandlerGetFeed(self.cfg.Feed, g))
-	self.engine.POST("/api/feed/:id", getHandlerPostFeed(self.cfg.Feed, g))
-	self.engine.DELETE("/api/feed/:id", getHandlerDeleteFeed(self.cfg.Feed, g))
-	self.engine.POST("/api/feed/:id/refilter", getHandlerReFilter(g))
+	api.GET("/feed/:id", getHandlerGetFeed(self.cfg.Feed, g))
+	api.POST("/feed/:id", getHandlerPostFeed(self.cfg.Feed, g))
+	api.DELETE("/feed/:id", getHandlerDeleteFeed(self.cfg.Feed, g))
+	api.POST("/feed/:id/refilter", getHandlerReFilter(g))
 
-	self.engine.GET("/api/action", getHandlerGetActions(g))
-	self.engine.POST("/api/action", getHandlerAddAction(g))
-	self.engine.DELETE("/api/action", getHandlerDeleteAction(g))
+	api.GET("/action", getHandlerGetActions(g))
+	api.POST("/action", getHandlerAddAction(g))
+	api.DELETE("/action", getHandlerDeleteAction(g))
 
-	self.engine.GET("/api/filter", getHandlerGetFilters(g))
-	self.engine.POST("/api/filter", getHandlerAddFilter(g))
-	self.engine.PATCH("/api/filter", getHandlerUpdateFilter(g))
-	self.engine.DELETE("/api/filter", getHandlerDeleteFilter(g))
+	api.GET("/filter", getHandlerGetFilters(g))
+	api.POST("/filter", getHandlerAddFilter(g))
+	api.PATCH("/filter", getHandlerUpdateFilter(g))
+	api.DELETE("/filter", getHandlerDeleteFilter(g))
 
 	return nil
 }

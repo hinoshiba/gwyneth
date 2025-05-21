@@ -1,0 +1,135 @@
+{{ define "layout" }}
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>{{ block "title" . }}管理画面{{ end }}</title>
+		<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+		<style>
+:root {
+	--sidebar-width: 250px;
+}
+
+	body {
+		margin: 0;
+	}
+
+	#sidebar {
+		width: var(--sidebar-width);
+		background-color: #343a40;
+		color: white;
+		padding: 1rem;
+		position: fixed;
+		top: 0;
+		left: 0;
+		height: 100vh;
+		overflow-y: auto;
+		transition: transform 0.3s ease;
+		z-index: 1000;
+	}
+
+	#sidebar.collapsed {
+		transform: translateX(-100%);
+	}
+
+	#sidebarToggle {
+		position: fixed;
+		top: 10px;
+		left: 10px;
+		z-index: 1100;
+		background: #343a40;
+		color: white;
+		border: none;
+		padding: 5px 12px;
+		border-radius: 4px;
+		display: none;
+	}
+
+	main {
+		margin-left: var(--sidebar-width);
+		padding: 2rem;
+		background-color: #f8f9fa;
+		transition: margin-left 0.3s ease;
+	}
+
+	body.sidebar-collapsed main {
+		margin-left: 0;
+	}
+
+	footer {
+		font-size: 0.8rem;
+		color: #666;
+		margin-top: 3rem;
+		text-align: center;
+	}
+
+	a.sidebar-link {
+		color: white;
+		text-decoration: none;
+		display: block;
+		margin-bottom: 0.75rem;
+	}
+
+	a.sidebar-link:hover {
+		text-decoration: underline;
+	}
+		</style>
+	</head>
+	<body>
+
+		<button id="sidebarToggle" onclick="toggleSidebar()">Menu</button>
+
+		<div id="sidebar">
+			<div class="d-flex justify-content-between align-items-center mb-4">
+				<h5 class="mb-0">メニュー</h5>
+				<button class="btn btn-sm btn-light text-dark" onclick="toggleSidebar()" title="閉じる">&times;</button>
+			</div>
+			<a href="/search" class="sidebar-link">Search</a>
+			<a href="/source" class="sidebar-link">Source</a>
+			<a href="/source_type" class="sidebar-link">Source Type</a>
+			<a href="/action" class="sidebar-link">Action</a>
+			<a href="/filter" class="sidebar-link">Filter</a>
+		</div>
+
+		<main>
+			{{ block "content" . }}{{ end }}
+
+			<footer>
+				Powered by Gwyneth.<br>
+				Gwyneth sows the words 'Bad Wolf' like breadcrumbs, daring the curious to follow.
+			</footer>
+
+			{{ block "scripts" . }}{{ end }}
+		</main>
+
+		<script>
+			function toggleSidebar() {
+				const sidebar = document.getElementById('sidebar');
+				const toggleBtn = document.getElementById('sidebarToggle');
+				const body = document.body;
+
+				sidebar.classList.toggle('collapsed');
+				body.classList.toggle('sidebar-collapsed');
+
+				toggleBtn.style.display = sidebar.classList.contains('collapsed') ? 'block' : 'none';
+			}
+
+			window.addEventListener('load', function () {
+				const sidebar = document.getElementById('sidebar');
+				const toggleBtn = document.getElementById('sidebarToggle');
+				const body = document.body;
+
+				if (sidebar.classList.contains('collapsed')) {
+					toggleBtn.style.display = 'block';
+					body.classList.add('sidebar-collapsed');
+				} else {
+					toggleBtn.style.display = 'none';
+					body.classList.remove('sidebar-collapsed');
+				}
+			});
+		</script>
+
+	</body>
+</html>
+{{ end }}

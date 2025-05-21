@@ -292,7 +292,7 @@ func (self *Session) GetSources() ([]*structs.Source, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
-	rows, err := self.db.Query("SELECT id, title, type, source, pause FROM source WHERE disable <> 1")
+	rows, err := self.db.Query("SELECT id, title, type, source, pause FROM source WHERE disable <> 1 ORDER BY title ASC")
 	if err != nil {
 		return nil, err
 	}
@@ -338,7 +338,7 @@ func (self *Session) FindSource(kw string) ([]*structs.Source, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
-	rows, err := self.db.Query("SELECT id, title, type, source, pause FROM source WHERE title = ? AND disable <> 1", kw)
+	rows, err := self.db.Query("SELECT id, title, type, source, pause FROM source WHERE title = ? AND disable <> 1 ORDER BY title ASC", kw)
 	if err != nil {
 		return nil, err
 	}
@@ -388,7 +388,7 @@ func (self *Session) GetSource(id *structs.Id) (*structs.Source, error) {
 }
 
 func (self *Session) getSource(id *structs.Id) (*structs.Source, error) {
-	rows, err := self.db.Query("SELECT id, title, type, source, pause FROM source WHERE id = ? LIMIT 1", id.Value())
+	rows, err := self.db.Query("SELECT id, title, type, source, pause FROM source WHERE id = ? ORDER BY id ASC LIMIT 1", id.Value())
 	if err != nil {
 		return nil, err
 	}
@@ -460,7 +460,7 @@ func (self *Session) ResumeSource(id *structs.Id) error {
 }
 
 func (self *Session) getArticle(id *structs.Id) (*structs.Article, error) {
-	as, err := self.query4article("SELECT id, src_id, title, body, link, timestamp, raw FROM article WHERE id = ? AND disable <> 1 LIMIT 1", id.Value())
+	as, err := self.query4article("SELECT id, src_id, title, body, link, timestamp, raw FROM article WHERE id = ? AND disable <> 1 ORDER BY id ASC LIMIT 1", id.Value())
 	if err != nil {
 		return nil, err
 	}
@@ -670,7 +670,7 @@ func (self *Session) GetActions() ([]*filter.Action, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
-	rows, err := self.db.Query("SELECT * FROM action")
+	rows, err := self.db.Query("SELECT * FROM action ORDER BY name ASC")
 	if err != nil {
 		return nil, err
 	}
@@ -706,7 +706,7 @@ func (self *Session) GetAction(id *structs.Id) (*filter.Action, error) {
 }
 
 func (self *Session) getAction(id *structs.Id) (*filter.Action, error) {
-	rows, err := self.db.Query("SELECT * FROM action WHERE id = ? LIMIT 1", id.Value())
+	rows, err := self.db.Query("SELECT * FROM action WHERE id = ?  ORDER BY id ASC LIMIT 1", id.Value())
 	if err != nil {
 		return nil, err
 	}
@@ -784,7 +784,7 @@ func (self *Session) GetFilter(id *structs.Id) (*filter.Filter, error) {
 }
 
 func (self *Session) getFilter(id *structs.Id) (*filter.Filter, error) {
-	rows, err := self.db.Query("SELECT * FROM filter WHERE id = ? LIMIT 1", id.Value())
+	rows, err := self.db.Query("SELECT * FROM filter WHERE id = ?  ORDER BY id ASC LIMIT 1", id.Value())
 	if err != nil {
 		return nil, err
 	}
@@ -823,7 +823,7 @@ func (self *Session) GetFilters() ([]*filter.Filter, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
-	rows, err := self.db.Query("SELECT * FROM filter")
+	rows, err := self.db.Query("SELECT * FROM filter ORDER BY val_title ASC")
 	if err != nil {
 		return nil, err
 	}
@@ -903,7 +903,7 @@ func (self *Session) GetFilterOnSource(src_id *structs.Id) ([]*filter.Filter, er
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
-	rows, err := self.db.Query("SELECT filter_id FROM src_filter_map WHERE src_id = ?", src_id.Value())
+	rows, err := self.db.Query("SELECT filter_id FROM src_filter_map WHERE src_id = ? ORDER BY id ASC", src_id.Value())
 	if err != nil {
 		return nil, err
 	}
@@ -935,7 +935,7 @@ func (self *Session) GetSourceWithEnabledFilter(f_id *structs.Id) ([]*structs.So
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
-	rows, err := self.db.Query("SELECT filter_id FROM src_filter_map WHERE filter_id = ?", f_id.Value())
+	rows, err := self.db.Query("SELECT filter_id FROM src_filter_map WHERE filter_id = ? ORDER BY id ASC", f_id.Value())
 	if err != nil {
 		return nil, err
 	}
