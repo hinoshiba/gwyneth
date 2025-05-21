@@ -1,160 +1,117 @@
 {{ define "content" }}
-<h2>Sources</h2>
-
-<div class="card mb-4">
-	<div class="card-body">
-		<h5 class="card-title">Add New Source</h5>
-		<div class="row g-2">
-			<div class="col-md-4">
-				<input type="text" id="title" class="form-control" placeholder="Title">
-			</div>
-			<div class="col-md-4">
-				<input type="text" id="value" class="form-control" placeholder="Value (e.g. URL)">
-			</div>
-			<div class="col-md-3">
-				<select id="type" class="form-select"></select>
-			</div>
-			<div class="col-md-1">
-				<button onclick="addSource()" class="btn btn-primary w-100">Add</button>
-			</div>
-		</div>
+<h3 class="mb-3">Add New Source</h3>
+<div class="row mb-4">
+	<div class="col-md-3">
+		<input type="text" id="title" class="form-control form-control-sm" placeholder="Title">
+	</div>
+	<div class="col-md-3">
+		<input type="text" id="value" class="form-control form-control-sm" placeholder="Value">
+	</div>
+	<div class="col-md-3">
+		<select id="type" class="form-select form-select-sm"></select>
+	</div>
+	<div class="col-md-3">
+		<button class="btn btn-sm btn-primary w-100" onclick="addSource()">Add Source</button>
 	</div>
 </div>
-
-<div class="table-responsive">
-	<table class="table table-bordered table-hover" id="sourcesTable">
-		<thead class="table-dark">
-			<tr>
-				<th id="th-id" onclick="sortTable('id')" style="cursor:pointer">ID</th>
-				<th>Feed</th>
-				<th id="th-title" onclick="sortTable('title')" style="cursor:pointer">Name</th>
-				<th id="th-value" onclick="sortTable('value')" style="cursor:pointer">Value</th>
-				<th id="th-type" onclick="sortTable('type')" style="cursor:pointer">Type</th>
-				<th id="th-pause" onclick="sortTable('pause')" style="cursor:pointer">Pause</th>
-				<th>Action</th>
-			</tr>
-		</thead>
-		<tbody id="sourcesTableBody"></tbody>
-	</table>
+<h2 class="mb-3">Sources</h2>
+<div class="d-flex justify-content-between align-items-center mb-3">
+	<div>
+		<label for="itemsPerPage" class="me-2">表示件数:</label>
+		<select id="itemsPerPage" class="form-select d-inline-block w-auto form-select-sm">
+			<option value="5">5</option>
+			<option value="10">10</option>
+			<option value="25" selected>25</option>
+			<option value="50">50</option>
+			<option value="100">100</option>
+		</select>
+	</div>
+	<div id="paginationControls" class="btn-group"></div>
 </div>
+<table class="table table-bordered table-sm">
+	<thead class="table-dark">
+		<tr>
+			<th>ID</th>
+			<th>FeedUrl</th>
+			<th>Name</th>
+			<th>Value</th>
+			<th>Type</th>
+			<th>Pause</th>
+			<th>Action</th>
+		</tr>
+	</thead>
+	<tbody id="sourcesTableBody"></tbody>
+</table>
 {{ end }}
 
 {{ define "scripts" }}
 <script>
-	let sourcesData = [];
-	let currentSort = { column: null, ascending: true };
+	let allSources = [];
+	let currentPage = 1;
+	let itemsPerPage = 25;
+
+	function paginateSources() {
+		const start = (currentPage - 1) * itemsPerPage;
+		const end = start + itemsPerPage;
+		const visibleSources = allSources.slice(start, end);
+
+		const tbody = document.getElementById('sourcesTableBody');
+		tbody.innerHTML = '';
+
+		visibleSources.forEach(source => {
+			const row = document.createElement('tr');
+			row.innerHTML = `
+		<td><a href="./source/${source.id}">${source.id}</a></td>
+		<td><a href="./api/feed/${source.id}" target="_blank" rel="noopener noreferrer">feed</a></td>
+		<td>${source.title}</td>
+		<td>${source.value}</td>
+		<td>${source.type.name}</td>
+		<td><span class="badge bg-${source.pause ? 'danger' : 'success'}">${source.pause ? 'Paused' : 'Active'}</span></td>
+		<td><button class="btn btn-sm btn-outline-secondary" onclick="deleteSource('${source.id}')">Delete</button></td>
+	  `;
+			tbody.appendChild(row);
+		});
+
+		renderPaginationControls();
+	}
+
+	function renderPaginationControls() {
+		const pageCount = Math.ceil(allSources.length / itemsPerPage);
+		const container = document.getElementById('paginationControls');
+		container.innerHTML = '';
+
+		for (let i = 1; i <= pageCount; i++) {
+			const btn = document.createElement('button');
+			btn.className = `btn btn-sm ${i === currentPage ? 'btn-primary' : 'btn-outline-primary'}`;
+			btn.innerText = i;
+			btn.onclick = () => {
+				currentPage = i;
+				paginateSources();
+			};
+			container.appendChild(btn);
+		}
+	}
 
 	function fetchSourceTypes() {
 		fetch('./api/source_type')
 			.then(res => res.json())
 			.then(data => {
-				const select = document.getElementById('type');
-				select.innerHTML = '';
-				data.forEach(type => {
-					const option = document.createElement('option');
-					option.value = type.id;
-					option.textContent = type.name + (type.user_create ? '' : ' (system)');
-					if (type.name === 'rss') option.selected = true;
-					select.appendChild(option);
+				const typeSelect = document.getElementById('type');
+				typeSelect.innerHTML = '';
+				data.forEach(t => {
+					const opt = document.createElement('option');
+					opt.value = t.id;
+					opt.textContent = t.name + (t.user_create ? '' : ' (system)');
+					if (t.name === 'noop') opt.selected = true;
+					typeSelect.appendChild(opt);
 				});
-			})
-			.catch(err => console.error('Error fetching types:', err));
-	}
-
-	function fetchSources() {
-		fetch('./api/source')
-			.then(res => res.json())
-			.then(data => {
-				sourcesData = data;
-				renderTable();
-				updateSortIcons();
-			})
-			.catch(err => console.error('Error fetching sources:', err));
-	}
-
-	function renderTable() {
-		const body = document.getElementById('sourcesTableBody');
-		body.innerHTML = '';
-		sourcesData.forEach(source => {
-			const row = document.createElement('tr');
-			row.innerHTML = `
-		<td><a href="./source/${source.id}">${source.id}</a></td>
-		<td><a href="./api/feed/${source.id}" target="_blank">feed</a></td>
-		<td>${source.title}</td>
-		<td>${source.value}</td>
-		<td>${source.type.name}</td>
-		<td>${source.pause}</td>
-		<td>
-		  <button class="btn btn-sm btn-danger" onclick="deleteSource('${source.id}')">Delete</button>
-		</td>
-	  `;
-			body.appendChild(row);
-		});
-	}
-
-	function sortTable(column) {
-		if (currentSort.column === column) {
-			currentSort.ascending = !currentSort.ascending;
-		} else {
-			currentSort.column = column;
-			currentSort.ascending = true;
-		}
-
-		sourcesData.sort((a, b) => {
-			let valA, valB;
-
-			switch (column) {
-				case 'id':
-					valA = a.id; valB = b.id; break;
-				case 'title':
-					valA = a.title.toLowerCase(); valB = b.title.toLowerCase(); break;
-				case 'value':
-					valA = a.value.toLowerCase(); valB = b.value.toLowerCase(); break;
-				case 'type':
-					valA = a.type.name.toLowerCase(); valB = b.type.name.toLowerCase(); break;
-				case 'pause':
-					valA = String(a.pause).toLowerCase(); valB = String(b.pause).toLowerCase(); break;
-				default:
-					return 0;
-			}
-
-			if (valA < valB) return currentSort.ascending ? -1 : 1;
-			if (valA > valB) return currentSort.ascending ? 1 : -1;
-			return 0;
-		});
-
-		renderTable();
-		updateSortIcons();
-	}
-
-	function updateSortIcons() {
-		const columns = {
-			id: 'ID',
-			title: 'Name',
-			value: 'Value',
-			type: 'Type',
-			pause: 'Pause'
-		};
-
-		for (const col in columns) {
-			const th = document.getElementById(`th-${col}`);
-			if (currentSort.column === col) {
-				th.innerText = `${columns[col]} ${currentSort.ascending ? '▲' : '▼'}`;
-			} else {
-				th.innerText = columns[col];
-			}
-		}
+			});
 	}
 
 	function addSource() {
-		const title = document.getElementById('title').value.trim();
-		const value = document.getElementById('value').value.trim();
+		const title = document.getElementById('title').value;
+		const value = document.getElementById('value').value;
 		const type_id = document.getElementById('type').value;
-
-		if (!title || !value) {
-			alert("Title and Value are required.");
-			return;
-		}
 
 		fetch('./api/source', {
 			method: 'POST',
@@ -163,22 +120,28 @@
 		})
 			.then(res => {
 				if (res.ok) {
-					fetchSources();
 					document.getElementById('title').value = '';
 					document.getElementById('value').value = '';
+					fetchSources();
 				} else {
-					alert("Failed to add source.");
-					console.error('Add failed', res);
+					alert('Failed to add source');
 				}
 			})
-			.catch(err => {
-				alert("Error adding source.");
-				console.error('Error:', err);
-			});
+			.catch(err => console.error('Error adding source:', err));
+	}
+
+	function fetchSources() {
+		fetch('./api/source')
+			.then(res => res.json())
+			.then(data => {
+				allSources = data;
+				paginateSources();
+			})
+			.catch(err => console.error('Error fetching sources:', err));
 	}
 
 	function deleteSource(id) {
-		if (!confirm("Are you sure you want to delete this source?")) return;
+		if (!confirm("Are you sure you want to delete?")) return;
 
 		fetch('./api/source', {
 			method: 'DELETE',
@@ -187,21 +150,23 @@
 		})
 			.then(res => {
 				if (res.ok) {
-					fetchSources();
+					allSources = allSources.filter(s => s.id !== id);
+					paginateSources();
 				} else {
-					alert("Failed to delete source.");
-					console.error('Delete failed', res);
+					console.error('Failed to delete source');
 				}
 			})
-			.catch(err => {
-				alert("Error deleting source.");
-				console.error('Error:', err);
-			});
+			.catch(err => console.error('Error deleting source:', err));
 	}
 
-	document.addEventListener('DOMContentLoaded', function () {
+	document.addEventListener('DOMContentLoaded', () => {
 		fetchSourceTypes();
 		fetchSources();
+		document.getElementById('itemsPerPage').addEventListener('change', function () {
+			itemsPerPage = parseInt(this.value);
+			currentPage = 1;
+			paginateSources();
+		});
 	});
 </script>
 {{ end }}

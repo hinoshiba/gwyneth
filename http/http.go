@@ -93,7 +93,7 @@ func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
 	self.engine.Static("/static", "/usr/local/src/http/static")
 
 	self.engine.GET("/", func(c *gin.Context) {
-		c.Render(http.StatusOK, makeRenderHtml("index.html", nil))
+		c.Redirect(http.StatusMovedPermanently, "/source")
 	})
 
 	self.engine.GET("/search", func(c *gin.Context) {
@@ -117,16 +117,17 @@ func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
 		))
 	})
 
-/*
 	self.engine.GET("/source/:id", func(c *gin.Context) {
 		src_id := c.Param("id")
 
-		c.HTML(http.StatusOK, "source_detail.html", gin.H{
-			"message": fmt.Sprintf("Gwyneth %s", consts.VERSION),
-			"src_id": fmt.Sprintf("%s", src_id),
-		})
+		c.Render(http.StatusOK, makeRenderHtml(
+			"source_detail.html",
+			&gin.H{
+				"Page": "source_detail",
+				"src_id": fmt.Sprintf("%s", src_id),
+			},
+		))
 	})
-*/
 
 	self.engine.GET("/action", func(c *gin.Context) {
 		c.Render(http.StatusOK, makeRenderHtml(
@@ -142,19 +143,19 @@ func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
 		))
 	})
 
-/*
 	self.engine.GET("/filter/:id", func(c *gin.Context) {
 		filter_id := c.Param("id")
 
-		c.HTML(http.StatusOK, "filter_detail.html", gin.H{
-			"message": fmt.Sprintf("Gwyneth %s", consts.VERSION),
-			"filter_id": fmt.Sprintf("%s", filter_id),
-		})
+		c.Render(http.StatusOK, makeRenderHtml(
+			"filter_detail.html",
+			&gin.H{
+				"Page": "filter_detail",
+				"filter_id": fmt.Sprintf("%s", filter_id),
+			},
+		))
 	})
-*/
 
 	api := self.engine.Group("/api")
-
 	api.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "pong",

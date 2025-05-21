@@ -903,7 +903,7 @@ func (self *Session) GetFilterOnSource(src_id *structs.Id) ([]*filter.Filter, er
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
-	rows, err := self.db.Query("SELECT filter_id FROM src_filter_map WHERE src_id = ? ORDER BY id ASC", src_id.Value())
+	rows, err := self.db.Query("SELECT filter_id FROM src_filter_map WHERE src_id = ? ORDER BY filter_id ASC", src_id.Value())
 	if err != nil {
 		return nil, err
 	}
