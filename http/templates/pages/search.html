@@ -1,0 +1,167 @@
+{{ define "content" }}
+<h2>Feed Search</h2>
+
+<form name="feedform" class="bg-light p-4 rounded shadow-sm">
+	<div class="row mb-3">
+		<label for="title" class="col-sm-2 col-form-label">Title</label>
+		<div class="col-sm-10">
+			<input type="text" name="title" id="title" class="form-control" placeholder="CVE-">
+		</div>
+	</div>
+	<div class="row mb-3">
+		<label for="body" class="col-sm-2 col-form-label">Body</label>
+		<div class="col-sm-10">
+			<input type="text" name="body" id="body" class="form-control" placeholder="CVE-">
+		</div>
+	</div>
+	<div class="row mb-3">
+		<label for="start_date" class="col-sm-2 col-form-label">Start Date</label>
+		<div class="col-sm-4">
+			<input type="date" name="start_date" id="start_date" class="form-control">
+		</div>
+		<label for="end_date" class="col-sm-2 col-form-label">End Date</label>
+		<div class="col-sm-4">
+			<input type="date" name="end_date" id="end_date" class="form-control">
+		</div>
+	</div>
+	<div class="row mb-3">
+		<label for="sources" class="col-sm-2 col-form-label">Sources</label>
+		<div class="col-sm-10">
+			<select id="sources" name="sources" class="form-select" multiple></select>
+			<div class="form-text">複数選択可（Ctrl / ⌘ + クリック）</div>
+		</div>
+	</div>
+
+	<input type="submit" hidden>
+
+	<div class="d-flex justify-content-start mt-3">
+		<div class="submit_link" onclick="submit_form()" style="cursor: pointer;">
+			<div class="feedicon me-2">
+				<div class="f1"></div>
+				<div class="f2"></div>
+				<div class="f3"></div>
+			</div>
+			rss subscribe
+		</div>
+	</div>
+</form>
+{{ end }}
+
+{{ define "scripts" }}
+<style>
+.submit_link {
+	display: inline-flex;
+	align-items: center;
+	background: #FCD997;
+	color: #332C1F;
+	padding: 12px 24px;
+	border-radius: 30px;
+	font-size: 1.2rem;
+	font-weight: bold;
+}
+
+  .feedicon {
+	  width: 22px;
+	  height: 22px;
+	  position: relative;
+	  background-color: #f49f0f;
+	  border: 6px solid #f49f0f;
+	  border-radius: 6px;
+  }
+
+  .f1, .f2, .f3 {
+	  position: absolute;
+  }
+
+  .f1 {
+	  background-color: #fff;
+	  width: 6px;
+	  height: 6px;
+	  border-radius: 50%;
+	  bottom: 0;
+	  left: 0;
+  }
+
+  .f2, .f3 {
+	  border-top: 5px solid #fff;
+	  border-right: 5px solid #fff;
+  }
+
+  .f2 {
+	  width: 9px;
+	  height: 9px;
+	  border-radius: 0 13px 0 0;
+	  bottom: 0;
+  }
+
+  .f3 {
+	  width: 17px;
+	  height: 17px;
+	  border-radius: 0 22px 0 0;
+  }
+</style>
+
+<script>
+	function fetchSourcesForSearch() {
+		fetch('./api/source')
+			.then(res => res.json())
+			.then(data => {
+				const select = document.getElementById('sources');
+				select.innerHTML = '';
+				data.forEach(src => {
+					const option = document.createElement('option');
+					option.value = src.id;
+					option.textContent = src.title;
+					select.appendChild(option);
+				});
+			})
+			.catch(err => {
+				alert("Failed to fetch sources.");
+				console.error('Source fetch error:', err);
+			});
+	}
+
+	function submit_form() {
+		const form = document.feedform;
+
+		const start = form.elements["start_date"].value;
+		if (start) {
+			const unix = Math.floor(new Date(start).getTime() / 1000);
+			const input = document.createElement("input");
+			input.type = "hidden";
+			input.name = "start";
+			input.value = unix;
+			form.appendChild(input);
+		}
+
+		const end = form.elements["end_date"].value;
+		if (end) {
+			const unix = Math.floor(new Date(end).getTime() / 1000);
+			const input = document.createElement("input");
+			input.type = "hidden";
+			input.name = "end";
+			input.value = unix;
+			form.appendChild(input);
+		}
+
+		const sources = document.getElementById('sources').selectedOptions;
+		for (let opt of sources) {
+			const input = document.createElement("input");
+			input.type = "hidden";
+			input.name = "sources";
+			input.value = opt.value;
+			form.appendChild(input);
+		}
+
+		form.action = "./api/article";
+		form.method = "get";
+		form.submit();
+	}
+
+	document.addEventListener('DOMContentLoaded', fetchSourcesForSearch);
+</script>
+{{ end }}
+
+{{define "contents"}}
+	{{ template "layout" . }}
+{{ end }}

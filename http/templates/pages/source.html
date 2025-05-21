@@ -1,0 +1,176 @@
+{{ define "content" }}
+<h3 class="mb-3">Add New Source</h3>
+<div class="row mb-4">
+	<div class="col-md-3">
+		<input type="text" id="title" class="form-control form-control-sm" placeholder="Title">
+	</div>
+	<div class="col-md-3">
+		<input type="text" id="value" class="form-control form-control-sm" placeholder="Value">
+	</div>
+	<div class="col-md-3">
+		<select id="type" class="form-select form-select-sm"></select>
+	</div>
+	<div class="col-md-3">
+		<button class="btn btn-sm btn-primary w-100" onclick="addSource()">Add Source</button>
+	</div>
+</div>
+<h2 class="mb-3">Sources</h2>
+<div class="d-flex justify-content-between align-items-center mb-3">
+	<div>
+		<label for="itemsPerPage" class="me-2">表示件数:</label>
+		<select id="itemsPerPage" class="form-select d-inline-block w-auto form-select-sm">
+			<option value="5">5</option>
+			<option value="10">10</option>
+			<option value="25" selected>25</option>
+			<option value="50">50</option>
+			<option value="100">100</option>
+		</select>
+	</div>
+	<div id="paginationControls" class="btn-group"></div>
+</div>
+<table class="table table-bordered table-sm">
+	<thead class="table-dark">
+		<tr>
+			<th>ID</th>
+			<th>FeedUrl</th>
+			<th>Name</th>
+			<th>Value</th>
+			<th>Type</th>
+			<th>Pause</th>
+			<th>Action</th>
+		</tr>
+	</thead>
+	<tbody id="sourcesTableBody"></tbody>
+</table>
+{{ end }}
+
+{{ define "scripts" }}
+<script>
+	let allSources = [];
+	let currentPage = 1;
+	let itemsPerPage = 25;
+
+	function paginateSources() {
+		const start = (currentPage - 1) * itemsPerPage;
+		const end = start + itemsPerPage;
+		const visibleSources = allSources.slice(start, end);
+
+		const tbody = document.getElementById('sourcesTableBody');
+		tbody.innerHTML = '';
+
+		visibleSources.forEach(source => {
+			const row = document.createElement('tr');
+			row.innerHTML = `
+		<td><a href="./source/${source.id}">${source.id}</a></td>
+		<td><a href="./api/feed/${source.id}" target="_blank" rel="noopener noreferrer">feed</a></td>
+		<td>${source.title}</td>
+		<td>${source.value}</td>
+		<td>${source.type.name}</td>
+		<td><span class="badge bg-${source.pause ? 'danger' : 'success'}">${source.pause ? 'Paused' : 'Active'}</span></td>
+		<td><button class="btn btn-sm btn-outline-secondary" onclick="deleteSource('${source.id}')">Delete</button></td>
+	  `;
+			tbody.appendChild(row);
+		});
+
+		renderPaginationControls();
+	}
+
+	function renderPaginationControls() {
+		const pageCount = Math.ceil(allSources.length / itemsPerPage);
+		const container = document.getElementById('paginationControls');
+		container.innerHTML = '';
+
+		for (let i = 1; i <= pageCount; i++) {
+			const btn = document.createElement('button');
+			btn.className = `btn btn-sm ${i === currentPage ? 'btn-primary' : 'btn-outline-primary'}`;
+			btn.innerText = i;
+			btn.onclick = () => {
+				currentPage = i;
+				paginateSources();
+			};
+			container.appendChild(btn);
+		}
+	}
+
+	function fetchSourceTypes() {
+		fetch('./api/source_type')
+			.then(res => res.json())
+			.then(data => {
+				const typeSelect = document.getElementById('type');
+				typeSelect.innerHTML = '';
+				data.forEach(t => {
+					const opt = document.createElement('option');
+					opt.value = t.id;
+					opt.textContent = t.name + (t.user_create ? '' : ' (system)');
+					if (t.name === 'noop') opt.selected = true;
+					typeSelect.appendChild(opt);
+				});
+			});
+	}
+
+	function addSource() {
+		const title = document.getElementById('title').value;
+		const value = document.getElementById('value').value;
+		const type_id = document.getElementById('type').value;
+
+		fetch('./api/source', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ title, value, type: { id: type_id } })
+		})
+			.then(res => {
+				if (res.ok) {
+					document.getElementById('title').value = '';
+					document.getElementById('value').value = '';
+					fetchSources();
+				} else {
+					alert('Failed to add source');
+				}
+			})
+			.catch(err => console.error('Error adding source:', err));
+	}
+
+	function fetchSources() {
+		fetch('./api/source')
+			.then(res => res.json())
+			.then(data => {
+				allSources = data;
+				paginateSources();
+			})
+			.catch(err => console.error('Error fetching sources:', err));
+	}
+
+	function deleteSource(id) {
+		if (!confirm("Are you sure you want to delete?")) return;
+
+		fetch('./api/source', {
+			method: 'DELETE',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ id })
+		})
+			.then(res => {
+				if (res.ok) {
+					allSources = allSources.filter(s => s.id !== id);
+					paginateSources();
+				} else {
+					console.error('Failed to delete source');
+				}
+			})
+			.catch(err => console.error('Error deleting source:', err));
+	}
+
+	document.addEventListener('DOMContentLoaded', () => {
+		fetchSourceTypes();
+		fetchSources();
+		document.getElementById('itemsPerPage').addEventListener('change', function () {
+			itemsPerPage = parseInt(this.value);
+			currentPage = 1;
+			paginateSources();
+		});
+	});
+</script>
+{{ end }}
+
+{{define "contents"}}
+	{{ template "layout" . }}
+{{ end }}

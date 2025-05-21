@@ -1,0 +1,242 @@
+{{ define "content" }}
+<h2>Filters</h2>
+
+<div class="card mb-4">
+	<div class="card-body">
+		<h5 class="card-title">Add New Filter</h5>
+		<div class="row g-2 mb-2">
+			<div class="col-md-6">
+				<label class="form-label">Title Pattern</label>
+				<input type="text" id="title_value" class="form-control" placeholder="e.g. CVE-2025">
+				<div class="form-check mt-1">
+					<input class="form-check-input" type="checkbox" id="title_regex">
+					<label class="form-check-label" for="title_regex">Regex</label>
+				</div>
+			</div>
+			<div class="col-md-6">
+				<label class="form-label">Body Pattern</label>
+				<input type="text" id="body_value" class="form-control" placeholder="e.g. vulnerability">
+				<div class="form-check mt-1">
+					<input class="form-check-input" type="checkbox" id="body_regex">
+					<label class="form-check-label" for="body_regex">Regex</label>
+				</div>
+			</div>
+		</div>
+
+		<div class="row g-2">
+			<div class="col-md-10">
+				<label class="form-label">Action</label>
+				<select id="action" class="form-select"></select>
+			</div>
+			<div class="col-md-2 d-flex align-items-end">
+				<button onclick="addFilter()" class="btn btn-primary w-100">Add</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="table-responsive">
+	<table class="table table-bordered table-hover" id="filtersTable">
+		<thead class="table-dark">
+			<tr>
+				<th id="th-id" onclick="sortTable('id')" style="cursor:pointer">ID</th>
+				<th id="th-title" onclick="sortTable('title')" style="cursor:pointer">Title</th>
+				<th id="th-titleRegex" onclick="sortTable('titleRegex')" style="cursor:pointer">Title Regex</th>
+				<th id="th-body" onclick="sortTable('body')" style="cursor:pointer">Body</th>
+				<th id="th-bodyRegex" onclick="sortTable('bodyRegex')" style="cursor:pointer">Body Regex</th>
+				<th id="th-action" onclick="sortTable('action')" style="cursor:pointer">Action</th>
+				<th>Delete</th>
+			</tr>
+		</thead>
+		<tbody id="filtersTableBody"></tbody>
+	</table>
+</div>
+{{ end }}
+
+{{ define "scripts" }}
+<script>
+	let filtersData = [];
+	let currentSort = { column: null, ascending: true };
+
+	function fetchFilterTypes() {
+		fetch('./api/action')
+			.then(res => res.json())
+			.then(data => {
+				const select = document.getElementById('action');
+				select.innerHTML = '';
+				data.forEach(action => {
+					const option = document.createElement('option');
+					option.value = action.id;
+					option.textContent = action.name;
+					select.appendChild(option);
+				});
+			})
+			.catch(err => {
+				alert("Failed to load actions.");
+				console.error('Error fetching action list:', err);
+			});
+	}
+
+	function fetchFilters() {
+		fetch('./api/filter')
+			.then(res => res.json())
+			.then(data => {
+				filtersData = data;
+				renderTable();
+				updateSortIcons();
+			})
+			.catch(err => {
+				alert("Failed to load filters.");
+				console.error('Error fetching filters:', err);
+			});
+	}
+
+	function renderTable() {
+		const body = document.getElementById('filtersTableBody');
+		body.innerHTML = '';
+		filtersData.forEach(filter => {
+			const row = document.createElement('tr');
+			row.innerHTML = `
+		<td><a href="./filter/${filter.id}">${filter.id}</a></td>
+		<td>${filter.title.value}</td>
+		<td>${filter.title.regex}</td>
+		<td>${filter.body.value}</td>
+		<td>${filter.body.regex}</td>
+		<td>${filter.action.name}</td>
+		<td>
+		  <button class="btn btn-sm btn-danger" onclick="deleteFilter('${filter.id}')">Delete</button>
+		</td>
+	  `;
+			body.appendChild(row);
+		});
+	}
+
+	function sortTable(column) {
+		if (currentSort.column === column) {
+			currentSort.ascending = !currentSort.ascending;
+		} else {
+			currentSort.column = column;
+			currentSort.ascending = true;
+		}
+
+		filtersData.sort((a, b) => {
+			let valA, valB;
+			switch (column) {
+				case 'id':
+					valA = a.id; valB = b.id; break;
+				case 'title':
+					valA = a.title.value.toLowerCase(); valB = b.title.value.toLowerCase(); break;
+				case 'titleRegex':
+					valA = a.title.regex; valB = b.title.regex; break;
+				case 'body':
+					valA = a.body.value.toLowerCase(); valB = b.body.value.toLowerCase(); break;
+				case 'bodyRegex':
+					valA = a.body.regex; valB = b.body.regex; break;
+				case 'action':
+					valA = a.action.name.toLowerCase(); valB = b.action.name.toLowerCase(); break;
+				default:
+					return 0;
+			}
+
+			if (valA < valB) return currentSort.ascending ? -1 : 1;
+			if (valA > valB) return currentSort.ascending ? 1 : -1;
+			return 0;
+		});
+
+		renderTable();
+		updateSortIcons();
+	}
+
+	function updateSortIcons() {
+		const columns = {
+			id: "ID",
+			title: "Title",
+			titleRegex: "Title Regex",
+			body: "Body",
+			bodyRegex: "Body Regex",
+			action: "Action"
+		};
+
+		for (const col in columns) {
+			const th = document.getElementById(`th-${col}`);
+			if (currentSort.column === col) {
+				th.innerText = `${columns[col]} ${currentSort.ascending ? '▲' : '▼'}`;
+			} else {
+				th.innerText = columns[col];
+			}
+		}
+	}
+
+	function deleteFilter(id) {
+		if (!confirm("Are you sure you want to delete this filter?")) return;
+
+		fetch('./api/filter', {
+			method: 'DELETE',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ id })
+		})
+			.then(async res => {
+				if (res.ok) {
+					fetchFilters();
+				} else {
+					const msg = await res.text();
+					alert(`Failed to delete filter: ${msg || res.statusText}`);
+					console.error(`Delete failed: ${res.status}`, msg);
+				}
+			})
+			.catch(err => {
+				alert("Error deleting filter.");
+				console.error('Error deleting filter:', err);
+			});
+	}
+
+	function addFilter() {
+		const title_value = document.getElementById('title_value').value.trim();
+		const title_regex = document.getElementById('title_regex').checked;
+		const body_value = document.getElementById('body_value').value.trim();
+		const body_regex = document.getElementById('body_regex').checked;
+		const action_id = document.getElementById('action').value;
+
+		if (!title_value && !body_value) {
+			alert("At least one of title or body pattern must be provided.");
+			return;
+		}
+
+		fetch('./api/filter', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				title: { value: title_value, regex: title_regex },
+				body: { value: body_value, regex: body_regex },
+				action: { id: action_id }
+			})
+		})
+			.then(async res => {
+				if (res.ok) {
+					fetchFilters();
+					document.getElementById('title_value').value = '';
+					document.getElementById('title_regex').checked = false;
+					document.getElementById('body_value').value = '';
+					document.getElementById('body_regex').checked = false;
+				} else {
+					const msg = await res.text();
+					alert(`Failed to add filter: ${msg || res.statusText}`);
+					console.error(`Add failed: ${res.status}`, msg);
+				}
+			})
+			.catch(err => {
+				alert("Error adding filter.");
+				console.error('Error adding filter:', err);
+			});
+	}
+
+	document.addEventListener('DOMContentLoaded', function () {
+		fetchFilterTypes();
+		fetchFilters();
+	});
+</script>
+{{ end }}
+
+{{ define "contents" }}
+  {{ template "layout" . }}
+{{ end }}

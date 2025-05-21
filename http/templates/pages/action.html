@@ -1,0 +1,170 @@
+{{ define "content" }}
+<h2>Actions</h2>
+
+<div class="card mb-4">
+	<div class="card-body">
+		<h5 class="card-title">Add New Action</h5>
+		<div class="row g-2">
+			<div class="col-md-5">
+				<input type="text" id="name" class="form-control" placeholder="Name">
+			</div>
+			<div class="col-md-5">
+				<input type="text" id="command" class="form-control" placeholder="Command">
+			</div>
+			<div class="col-md-2">
+				<button onclick="addAction()" class="btn btn-primary w-100">Add</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="table-responsive">
+	<table class="table table-bordered table-hover" id="actionsTable">
+		<thead class="table-dark">
+			<tr>
+				<th id="th-id" onclick="sortTable('id')" style="cursor:pointer">ID</th>
+				<th id="th-name" onclick="sortTable('name')" style="cursor:pointer">Name</th>
+				<th id="th-command" onclick="sortTable('command')" style="cursor:pointer">Command</th>
+				<th>Action</th>
+			</tr>
+		</thead>
+		<tbody id="actionsTableBody"></tbody>
+	</table>
+</div>
+{{ end }}
+
+{{ define "scripts" }}
+<script>
+	let actionsData = [];
+	let currentSort = { column: null, ascending: true };
+
+	function fetchActions() {
+		fetch('./api/action')
+			.then(res => res.json())
+			.then(data => {
+				actionsData = data;
+				renderTable();
+				updateSortIcons();
+			})
+			.catch(err => {
+				alert("Failed to fetch actions.");
+				console.error('Fetch error:', err);
+			});
+	}
+
+	function renderTable() {
+		const body = document.getElementById('actionsTableBody');
+		body.innerHTML = '';
+		actionsData.forEach(action => {
+			const row = document.createElement('tr');
+			row.innerHTML = `
+		<td>${action.id}</td>
+		<td>${action.name}</td>
+		<td>${action.command}</td>
+		<td>
+		  <button class="btn btn-sm btn-danger" onclick="deleteAction('${action.id}')">Delete</button>
+		</td>
+	  `;
+			body.appendChild(row);
+		});
+	}
+
+	function sortTable(column) {
+		if (currentSort.column === column) {
+			currentSort.ascending = !currentSort.ascending;
+		} else {
+			currentSort.column = column;
+			currentSort.ascending = true;
+		}
+
+		actionsData.sort((a, b) => {
+			let valA = a[column];
+			let valB = b[column];
+
+			if (typeof valA === 'string') {
+				valA = valA.toLowerCase();
+				valB = valB.toLowerCase();
+			}
+
+			if (valA < valB) return currentSort.ascending ? -1 : 1;
+			if (valA > valB) return currentSort.ascending ? 1 : -1;
+			return 0;
+		});
+
+		renderTable();
+		updateSortIcons();
+	}
+
+	function updateSortIcons() {
+		const headers = ['id', 'name', 'command'];
+		headers.forEach(col => {
+			const th = document.getElementById(`th-${col}`);
+			if (currentSort.column === col) {
+				th.innerText = col.charAt(0).toUpperCase() + col.slice(1) + (currentSort.ascending ? ' ▲' : ' ▼');
+			} else {
+				th.innerText = col.charAt(0).toUpperCase() + col.slice(1);
+			}
+		});
+	}
+
+	function deleteAction(id) {
+		if (!confirm("Are you sure you want to delete this action?")) return;
+
+		fetch('./api/action', {
+			method: 'DELETE',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ id })
+		})
+			.then(async res => {
+				if (res.ok) {
+					fetchActions();
+				} else {
+					const msg = await res.text();
+					alert(`Failed to delete action: ${msg || res.statusText}`);
+					console.error(`Delete failed: ${res.status}`, msg);
+				}
+			})
+			.catch(err => {
+				alert("Error deleting action. Check console for details.");
+				console.error('Error deleting action:', err);
+			});
+	}
+
+	function addAction() {
+		const name = document.getElementById('name').value.trim();
+		const command = document.getElementById('command').value.trim();
+
+		if (!name || !command) {
+			alert("Both name and command are required.");
+			return;
+		}
+
+		fetch('./api/action', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ name, command })
+		})
+			.then(async res => {
+				if (res.ok) {
+					fetchActions();
+					document.getElementById('name').value = '';
+					document.getElementById('command').value = '';
+				} else {
+					const msg = await res.text();
+					alert(`Failed to add action: ${msg || res.statusText}`);
+					console.error(`Add failed: ${res.status}`, msg);
+				}
+			})
+			.catch(err => {
+				alert("Error adding action. Check console for details.");
+				console.error('Error adding action:', err);
+			});
+	}
+
+	document.addEventListener('DOMContentLoaded', fetchActions);
+</script>
+{{ end }}
+
+{{define "contents"}}
+	{{ template "layout" . }}
+{{ end }}

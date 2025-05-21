@@ -1,0 +1,111 @@
+{{ define "content" }}
+<h2>Source Types</h2>
+
+<div class="card mb-4">
+	<div class="card-body">
+		<h5 class="card-title">Add New Source Type</h5>
+		<div class="row g-2">
+			<div class="col-md-5">
+				<input type="text" id="name" class="form-control" placeholder="Name">
+			</div>
+			<div class="col-md-5">
+				<input type="text" id="command" class="form-control" placeholder="Command">
+			</div>
+			<div class="col-md-2">
+				<button onclick="addSourceType()" class="btn btn-primary w-100">Add</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="table-responsive">
+	<table class="table table-bordered table-hover" id="sourceTypesTable">
+		<thead class="table-dark">
+			<tr>
+				<th>ID</th>
+				<th>Name</th>
+				<th>Command</th>
+				<th>User Create</th>
+				<th>Action</th>
+			</tr>
+		</thead>
+		<tbody id="sourceTypesTableBody"></tbody>
+	</table>
+</div>
+{{ end }}
+
+{{ define "scripts" }}
+<script>
+	function fetchSourceTypes() {
+		fetch('./api/source_type', {
+			method: 'GET',
+			headers: { 'Content-Type': 'application/json' }
+		})
+			.then(res => res.json())
+			.then(data => {
+				const body = document.getElementById('sourceTypesTableBody');
+				body.innerHTML = '';
+				data.forEach(src => {
+					const row = document.createElement('tr');
+					row.innerHTML = `
+		  <td>${src.id}</td>
+		  <td>${src.name}</td>
+		  <td>${src.command}</td>
+		  <td>${src.user_create}</td>
+		  <td><button class="btn btn-sm btn-danger" onclick="deleteSourceType('${src.id}')">Delete</button></td>
+		`;
+					body.appendChild(row);
+				});
+			})
+			.catch(err => console.error('Error fetching source types:', err));
+	}
+
+	function deleteSourceType(id) {
+		if (!confirm("Are you sure you want to delete?")) return;
+		fetch('./api/source_type', {
+			method: 'DELETE',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ id })
+		})
+			.then(res => {
+				if (res.ok) {
+					fetchSourceTypes();
+				} else {
+					alert('Failed to delete source type of ' + id);
+					console.error('Failed to delete source type');
+				}
+			})
+			.catch(err => console.error('Error deleting:', err));
+	}
+
+	function addSourceType() {
+		const name = document.getElementById('name').value.trim();
+		const command = document.getElementById('command').value.trim();
+
+		if (!name || !command) return alert("Both fields are required.");
+
+		fetch('./api/source_type', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ name, command })
+		})
+			.then(res => {
+				if (res.ok) {
+					fetchSourceTypes();
+					document.getElementById('name').value = '';
+					document.getElementById('command').value = '';
+				} else {
+					alert('Failed to add source type');
+					console.error('Failed to add source type');
+				}
+			})
+			.catch(err => console.error('Error adding:', err));
+	}
+
+	window.addEventListener('load', fetchSourceTypes);
+</script>
+{{ end }}
+
+{{define "contents"}}
+  {{ template "layout" . }}
+{{ end }}
