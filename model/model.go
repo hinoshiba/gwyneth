@@ -109,6 +109,8 @@ type Source struct {
 	src_type *SourceType
 	val      string
 	pause    bool
+
+	latest_status  *Status
 }
 
 func NewSource(id *Id, title string, src_type *SourceType, val string, pause bool) *Source {
@@ -211,4 +213,10 @@ func (self *Article) ConvertExternal() *external.Article {
 		Timestamp: int(self.utime),
 		Raw: self.raw,
 	}
+}
+
+type Status struct {
+	UinxTime  int
+	IsSuccess bool
+	Log       string
 }
