@@ -3,7 +3,6 @@ package filter
 import (
 	"os/exec"
 	"fmt"
-	"log/slog"
 	"bufio"
 	"strings"
 	"syscall"
@@ -15,6 +14,7 @@ import (
 )
 
 import (
+	"github.com/hinoshiba/gwyneth/slog"
 	"github.com/hinoshiba/gwyneth/structs"
 	"github.com/hinoshiba/gwyneth/structs/external"
 )
@@ -55,7 +55,7 @@ func (self *Action) ConvertExternal() *external.Action {
 
 func (self *Action) Do(msn *task.Mission, artcl *structs.Article) error {
 	defer msn.Done()
-	slog.Debug(fmt.Sprintf("call '%s' '%s'", self.name, self.cmd))
+	slog.Debug("call '%s' '%s'", self.name, self.cmd)
 
 	args := strings.SplitN(self.cmd, " ", 30)
 	c := args[0]
@@ -128,6 +128,6 @@ func (self *Action) Do(msn *task.Mission, artcl *structs.Article) error {
 
 		return fmt.Errorf("%s: %s", err, errout)
 	}
-	slog.Debug(fmt.Sprintf("%s successed: %s, %s", self.cmd, output, errout))
+	slog.Debug("%s successed: %s, %s", self.cmd, output, errout)
 	return nil
 }

@@ -5,6 +5,7 @@ services:
       - ./etc/gwyneth.yaml:/app/gwyneth.yaml
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
+      - ./var/gwyneth/:/var/gwyneth
     ports:
       - "127.0.0.1:8001:80"
   db:

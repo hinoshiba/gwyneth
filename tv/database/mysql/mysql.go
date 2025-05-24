@@ -2,7 +2,6 @@ package mysql
 
 import (
 	"fmt"
-	"log/slog"
 	"sync"
 	"time"
 	"strings"
@@ -15,6 +14,7 @@ import (
 )
 
 import (
+	"github.com/hinoshiba/gwyneth/slog"
 	"github.com/hinoshiba/gwyneth/config"
 	"github.com/hinoshiba/gwyneth/structs"
 	"github.com/hinoshiba/gwyneth/filter"
@@ -78,17 +78,15 @@ func (self *Session) connect(db_auth string) error {
 
 		db, err := sql.Open("mysql", db_auth)
 		if err != nil {
-			msg := fmt.Sprintf("Failed: connect to DB: %s, trying reconnect (%d/%d) after %d sec.",
+			slog.Warn("Failed: connect to DB: %s, trying reconnect (%d/%d) after %d sec.",
 																		err, cnt, MAX_RETRY, wait_sec)
-			slog.Warn(msg)
 			continue
 		}
 		self.db = db
 
 		if err := self.init(); err != nil {
-			msg := fmt.Sprintf("Failed: connect to a DB: %s, trying reconnect (%d/%d) after %d sec.",
-											err, cnt, MAX_RETRY, wait_sec)
-			slog.Warn(msg)
+			slog.Warn("Failed: connect to a DB: %s, trying reconnect (%d/%d) after %d sec.",
+																		err, cnt, MAX_RETRY, wait_sec)
 			continue
 		}
 
@@ -540,7 +538,7 @@ func (self *Session) LookupArticles(t_kw string, b_kw string, src_ids []*structs
 		args = append(args, 30)
 	}
 
-	slog.Debug(fmt.Sprintf("%s, %v", q, args))
+	slog.Debug("%s, %v", q, args)
 
 	return self.query4article(q, args...)
 }

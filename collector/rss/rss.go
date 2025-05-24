@@ -1,8 +1,6 @@
 package rss
 
 import (
-	"fmt"
-	"log/slog"
 	"time"
 	"encoding/json"
 )
@@ -13,6 +11,7 @@ import (
 )
 
 import (
+	"github.com/hinoshiba/gwyneth/slog"
 	"github.com/hinoshiba/gwyneth/structs"
 )
 
@@ -39,7 +38,7 @@ func GetFeed(msn *task.Mission, src *structs.Source, artcl_ch chan <- *structs.A
 
 		raw_j, err := json.Marshal(item)
 		if err != nil {
-			slog.Warn(fmt.Sprintf("convert errror: cannot convert to json str from item struct. : '%s', '%s'", item.Title, url))
+			slog.Warn("convert errror: cannot convert to json str from item struct. : '%s', '%s'", item.Title, url)
 			continue
 		}
 

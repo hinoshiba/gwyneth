@@ -2,7 +2,6 @@ package gwyneth
 
 import (
 	"fmt"
-	"log/slog"
 	"time"
 	"regexp"
 )
@@ -12,6 +11,7 @@ import (
 )
 
 import (
+	"github.com/hinoshiba/gwyneth/slog"
 	"github.com/hinoshiba/gwyneth/config"
 	"github.com/hinoshiba/gwyneth/tv"
 	"github.com/hinoshiba/gwyneth/structs"
@@ -101,7 +101,7 @@ func (self *Gwyneth) run_core(msn *task.Mission) {
 				defer msn_clctr.Done()
 
 				if err := self.run_rss_collector(msn_clctr.New()); err != nil {
-					slog.Error(fmt.Sprintf("failed: wakeup rss collector: %s", err))
+					slog.Error("failed: wakeup rss collector: %s", err)
 				}
 			}(msn_clctr)
 		case <- self.update_filter.Recv():
@@ -114,7 +114,7 @@ func (self *Gwyneth) run_core(msn *task.Mission) {
 				defer msn_filtr.Done()
 
 				if err := self.run_filter_engine(msn_filtr.New()); err !=nil {
-					slog.Error(fmt.Sprintf("failed: wakeup article recorder: %s", err))
+					slog.Error("failed: wakeup article recorder: %s", err)
 				}
 			}(msn_filtr)
 		}
@@ -136,7 +136,7 @@ func (self *Gwyneth) run_article_recoder(msn *task.Mission) error {
 				if err == errors.ERR_ALREADY_EXIST_ARTICLE {
 					continue
 				}
-				slog.Warn(fmt.Sprintf("failed: addArticle: %s", err))
+				slog.Warn("failed: addArticle: %s", err)
 				continue
 			}
 
@@ -168,7 +168,7 @@ func (self *Gwyneth) run_filter_engine(msn *task.Mission) error {
 			if !ok {
 				new_fs, err := self.getFilterOnSource(artcl.Src().Id())
 				if err != nil {
-					slog.Warn(fmt.Sprintf("failed: cannot get filters for '%s': %s", artcl.Src().Id().String(), err))
+					slog.Warn("failed: cannot get filters for '%s': %s", artcl.Src().Id().String(), err)
 					continue
 				}
 
@@ -220,7 +220,7 @@ func (self *Gwyneth) run_rss_collector(msn *task.Mission) error {
 		tgts = append(tgts, src)
 	}
 	if len(tgts) < 1 {
-		slog.Info(fmt.Sprintf("rss collector is zero"))
+		slog.Info("rss collector is zero")
 		return nil
 	}
 
@@ -600,11 +600,11 @@ func action_filter(msn *task.Mission, args ...any) {
 	artcl := args[1].(*structs.Article)
 
 	if task.IsCanceled(msn) {
-		slog.Info(fmt.Sprintf("the filter's action is canceld"))
+		slog.Info("the filter's action is canceld")
 		return
 	}
 	if err := action.Do(msn.New(), artcl); err != nil {
-		slog.Error(fmt.Sprintf("failed: execute filter: %s", err))
+		slog.Error("failed: execute filter: %s", err)
 	}
 }
 
@@ -615,15 +615,15 @@ func rss_collector(msn *task.Mission, args ...any) {
 	artcl_ch := args[1].(chan *structs.Article)
 
 	if task.IsCanceled(msn) {
-		slog.Info(fmt.Sprintf("the collector of '%s' is canceld", src.Title()))
+		slog.Info("the collector of '%s' is canceld", src.Title())
 		return
 	}
 
-	slog.Debug(fmt.Sprintf("the collector of '%s' is running... :'%s'", src.Title(), src.Value()))
+	slog.Debug("the collector of '%s' is running... :'%s'", src.Title(), src.Value())
 	if err := rss.GetFeed(msn.New(), src, artcl_ch); err != nil {
-		slog.Warn(fmt.Sprintf("cannot collect '%s/%s': %s", src.Title(), src.Value(), err))
+		slog.Warn("cannot collect '%s/%s': %s", src.Title(), src.Value(), err)
 	}
-	slog.Debug(fmt.Sprintf("the collector of '%s' done!!!", src.Title()))
+	slog.Debug("the collector of '%s' done!!!", src.Title())
 }
 
 func split_src(size int, src_s []*structs.Source) [][]*structs.Source {

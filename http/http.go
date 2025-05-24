@@ -2,7 +2,6 @@ package http
 
 import (
 	"fmt"
-	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -20,6 +19,7 @@ import (
 
 import (
 	"github.com/hinoshiba/gwyneth"
+	"github.com/hinoshiba/gwyneth/slog"
 	"github.com/hinoshiba/gwyneth/consts"
 	"github.com/hinoshiba/gwyneth/config"
 	"github.com/hinoshiba/gwyneth/structs"
@@ -237,7 +237,7 @@ func getHandlerAddSourceType(g *gwyneth.Gwyneth) func(*gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.Debug(fmt.Sprintf("AddSourceType: request is '%v'", st))
+		slog.Debug("AddSourceType: request is '%v'", st)
 
 		added_st, err := g.AddSourceType(st.Name, st.Cmd, true)
 		if err != nil {
@@ -293,7 +293,7 @@ func getHandlerDeleteSourceType(g *gwyneth.Gwyneth) func(*gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.Debug(fmt.Sprintf("DeleteSourceType: request is '%v'", st))
+		slog.Debug("DeleteSourceType: request is '%v'", st)
 
 		id, err := structs.ParseStringId(st.Id)
 		if err != nil {
@@ -318,7 +318,7 @@ func getHandlerAddSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.Debug(fmt.Sprintf("AddSource: request is '%v'", src))
+		slog.Debug("AddSource: request is '%v'", src)
 
 		src_type_id, err := structs.ParseStringId(src.Type.Id)
 		if err != nil {
@@ -401,7 +401,7 @@ func getHandlerAddArticle(g *gwyneth.Gwyneth) func(*gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.Debug(fmt.Sprintf("AddArticle: request is '%v'", article))
+		slog.Debug("AddArticle: request is '%v'", article)
 
 		src_id, err := structs.ParseStringId(article.Src.Id)
 		if err != nil {
@@ -567,7 +567,7 @@ func getHandlerPostFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Context)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.Debug(fmt.Sprintf("BindFeed: request is '%v'", article))
+		slog.Debug("BindFeed: request is '%v'", article)
 
 		article_id, err := structs.ParseStringId(article.Id)
 		if err != nil {
@@ -604,7 +604,7 @@ func getHandlerDeleteFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Contex
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.Debug(fmt.Sprintf("UnBindFeed: request is '%v'", article))
+		slog.Debug("UnBindFeed: request is '%v'", article)
 
 		article_id, err := structs.ParseStringId(article.Id)
 		if err != nil {
@@ -709,7 +709,7 @@ func getHandlerAddAction(g *gwyneth.Gwyneth) func(*gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.Debug(fmt.Sprintf("AddAciton: request is '%v'", action))
+		slog.Debug("AddAciton: request is '%v'", action)
 
 		added_action, err := g.AddAction(action.Name, action.Cmd)
 		if err != nil {
@@ -786,7 +786,7 @@ func getHandlerAddFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.Debug(fmt.Sprintf("AddFilter: request is '%v'", f))
+		slog.Debug("AddFilter: request is '%v'", f)
 
 		action_id, err := structs.ParseStringId(f.Action.Id)
 		if err != nil {
@@ -922,7 +922,7 @@ func getHandlerReFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.Debug(fmt.Sprintf("ReFilter: request is '%v'", id))
+		slog.Debug("ReFilter: request is '%v'", id)
 
 		var json_data struct {
 			Limit int `json:"limit"`
@@ -958,7 +958,7 @@ func getHandlerBindFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.Debug(fmt.Sprintf("BindFilter: request is '%v'", f))
+		slog.Debug("BindFilter: request is '%v'", f)
 
 		f_id, err := structs.ParseStringId(f.Id)
 		if err != nil {
@@ -1021,7 +1021,7 @@ func getHandlerUnBindFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.Debug(fmt.Sprintf("BindFilter: request is '%v'", f))
+		slog.Debug("BindFilter: request is '%v'", f)
 
 		f_id, err := structs.ParseStringId(f.Id)
 		if err != nil {
