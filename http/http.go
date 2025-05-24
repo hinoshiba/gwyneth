@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"html/template"
 )
 
@@ -59,9 +60,14 @@ func (self *Router) Close() error {
 	return nil
 }
 
-func makeRenderHtml(fname string, param *gin.H) *render.HTML {
+func (self *Router) makeRenderHtml(fname string, param *gin.H) *render.HTML {
+	app_root := self.cfg.Http.Root
+	if !strings.HasSuffix(app_root, "/") {
+		app_root += "/"
+	}
 	data := gin.H{
 		"Version": consts.VERSION,
+		"AppRoot": app_root,
 	}
 	if param != nil {
 		for k, v := range *param {
@@ -85,6 +91,7 @@ func loadTemplate(fname string) *template.Template {
 
 	tmpl := template.New("").Funcs(template.FuncMap{
 		"eq": func(a, b string) bool { return a == b },
+
 	})
 	return template.Must(tmpl.ParseFiles(files...))
 }
@@ -93,25 +100,30 @@ func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
 	self.engine.Static("/static", "/usr/local/src/http/static")
 
 	self.engine.GET("/", func(c *gin.Context) {
-		c.Redirect(http.StatusMovedPermanently, "/source")
+		app_root := self.cfg.Http.Root
+		if !strings.HasSuffix(app_root, "/") {
+			app_root += "/"
+		}
+		path := fmt.Sprintf("%ssource", app_root)
+		c.Redirect(http.StatusMovedPermanently, path)
 	})
 
 	self.engine.GET("/search", func(c *gin.Context) {
-		c.Render(http.StatusOK, makeRenderHtml(
+		c.Render(http.StatusOK, self.makeRenderHtml(
 			"search.html",
 			&gin.H{"Page": "search"},
 		))
 	})
 
 	self.engine.GET("/source_type", func(c *gin.Context) {
-		c.Render(http.StatusOK, makeRenderHtml(
+		c.Render(http.StatusOK, self.makeRenderHtml(
 			"source_type.html",
 			&gin.H{"Page": "source_type"},
 		))
 	})
 
 	self.engine.GET("/source", func(c *gin.Context) {
-		c.Render(http.StatusOK, makeRenderHtml(
+		c.Render(http.StatusOK, self.makeRenderHtml(
 			"source.html",
 			&gin.H{"Page": "source"},
 		))
@@ -120,7 +132,7 @@ func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
 	self.engine.GET("/source/:id", func(c *gin.Context) {
 		src_id := c.Param("id")
 
-		c.Render(http.StatusOK, makeRenderHtml(
+		c.Render(http.StatusOK, self.makeRenderHtml(
 			"source_detail.html",
 			&gin.H{
 				"Page": "source_detail",
@@ -130,14 +142,14 @@ func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
 	})
 
 	self.engine.GET("/action", func(c *gin.Context) {
-		c.Render(http.StatusOK, makeRenderHtml(
+		c.Render(http.StatusOK, self.makeRenderHtml(
 			"action.html",
 			&gin.H{"Page": "action"},
 		))
 	})
 
 	self.engine.GET("/filter", func(c *gin.Context) {
-		c.Render(http.StatusOK, makeRenderHtml(
+		c.Render(http.StatusOK, self.makeRenderHtml(
 			"filter.html",
 			&gin.H{"Page": "filter"},
 		))
@@ -146,7 +158,7 @@ func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
 	self.engine.GET("/filter/:id", func(c *gin.Context) {
 		filter_id := c.Param("id")
 
-		c.Render(http.StatusOK, makeRenderHtml(
+		c.Render(http.StatusOK, self.makeRenderHtml(
 			"filter_detail.html",
 			&gin.H{
 				"Page": "filter_detail",
