@@ -113,6 +113,7 @@ func (self *Database) check() error {
 type Http struct {
 	Host string `yaml:"host"`
 	Port int    `yaml:"port"`
+	Root string `yaml:"app_root"`
 }
 
 func (self *Http) check() error {
