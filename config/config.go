@@ -3,11 +3,21 @@ package config
 import (
 	"os"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 )
 
 import (
 	"gopkg.in/yaml.v2"
+)
+
+var (
+	LOG_LEVELS = map[string]slog.Level{
+		"debug": slog.LevelDebug,
+		"info":  slog.LevelInfo,
+		"warn":  slog.LevelWarn,
+		"error": slog.LevelError,
+	}
 )
 
 func Load(path string) (*Config, error) {
@@ -36,6 +46,7 @@ type Config struct {
 	Database *Database `yaml:"database"`
 	Http     *Http     `yaml:"http"`
 	Feed     *Feed     `yaml:"feed"`
+	Log      *Log      `yaml:"log"`
 }
 
 func (self *Config) check() error {
@@ -48,7 +59,28 @@ func (self *Config) check() error {
 	if err := self.Feed.check(); err != nil {
 		return err
 	}
+	if err := self.Log.check(); err != nil {
+		return err
+	}
 	return nil
+}
+
+type Log struct {
+	Level string `yaml:"level"`
+}
+
+func (self *Log) check() error {
+	if self.Level == "" {
+		return fmt.Errorf("Log.Level is Empty")
+	}
+	if _, ok := LOG_LEVELS[self.Level]; !ok {
+		return fmt.Errorf("unknown log level: '%s'", self.Level)
+	}
+	return nil
+}
+
+func (self *Log) GetSlogLevel() slog.Level {
+	return LOG_LEVELS[self.Level]
 }
 
 type Database struct {

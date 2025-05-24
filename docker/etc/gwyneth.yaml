@@ -14,3 +14,5 @@ feed:
   author_name: hinoshiba
   author_email: hinoshiba@example.com
   default_type: rss
+log:
+  level: debug
