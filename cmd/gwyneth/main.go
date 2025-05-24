@@ -17,10 +17,6 @@ import (
 	"github.com/hinoshiba/gwyneth/config"
 )
 
-const (
-	LOG_LEVEL slog.Level = slog.LevelDebug
-)
-
 var (
 	Config *config.Config
 )
@@ -66,10 +62,11 @@ func init() {
 		slog.New(
 			slog.NewTextHandler(
 				os.Stdout,
-				&slog.HandlerOptions{Level: LOG_LEVEL},
+				&slog.HandlerOptions{Level: Config.Log.GetSlogLevel()},
 			),
 		),
 	)
+	slog.Info(fmt.Sprintf("LogLevel: %s", cfg.Log.Level))
 }
 
 func die(s string, msg ...any) {
