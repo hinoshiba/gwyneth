@@ -15,7 +15,7 @@ import (
 	"github.com/hinoshiba/gwyneth/model"
 )
 
-func GetFeed(msn *task.Mission, src *model.Source, artcl_ch chan <- *model.Article) error {
+func GetFeed(msn *task.Mission, logger *slog.Logger, src *model.Source, artcl_ch chan <- *model.Article) error {
 	defer msn.Done()
 
 	fp := gofeed.NewParser()
@@ -38,7 +38,7 @@ func GetFeed(msn *task.Mission, src *model.Source, artcl_ch chan <- *model.Artic
 
 		raw_j, err := json.Marshal(item)
 		if err != nil {
-			slog.Warn("convert errror: cannot convert to json str from item struct. : '%s', '%s'", item.Title, url)
+			logger.Warn("convert errror: cannot convert to json str from item struct. : '%s', '%s'", item.Title, url)
 			continue
 		}
 

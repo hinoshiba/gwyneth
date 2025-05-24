@@ -31,6 +31,8 @@ type Gwyneth struct {
 	tv  *tv.TimeVortex
 	msn *task.Mission
 
+	lm  *slog.LogManager
+
 	new_src       *noticer
 	update_filter *noticer
 
@@ -40,7 +42,7 @@ type Gwyneth struct {
 	default_source_type map[string]struct{}
 }
 
-func New(msn *task.Mission, cfg *config.Config) (*Gwyneth, error) {
+func New(msn *task.Mission, lm *slog.LogManager, cfg *config.Config) (*Gwyneth, error) {
 	t, err := tv.New(msn.New(), cfg)
 	if err != nil {
 		return nil, err
@@ -48,6 +50,8 @@ func New(msn *task.Mission, cfg *config.Config) (*Gwyneth, error) {
 	self := &Gwyneth {
 		tv: t,
 		msn: msn,
+
+		lm: lm,
 
 		artcl_ch: make(chan *model.Article),
 		do_filter_ch: make(chan *model.Article),
@@ -183,7 +187,7 @@ func (self *Gwyneth) run_filter_engine(msn *task.Mission) error {
 					go func(msn *task.Mission, f filter.Filter) {
 						defer msn.Done()
 						if f.IsMatch(artcl) {
-							p.Do(action_filter, msn.New(), f.Action(), artcl)
+							p.Do(action_filter, msn.New(), self.lm.GetActionsLogger(), f.Action(), artcl)
 						}
 					}(msn.New(), *f)
 				}
@@ -253,7 +257,7 @@ func (self *Gwyneth) run_rss_collector(msn *task.Mission) error {
 				}
 
 				for _, tgt := range tgts {
-					p.Do(rss_collector, msn.New(), tgt, self.artcl_ch)
+					p.Do(rss_collector, msn.New(), self.lm.GetCollectorsLogger(), tgt, self.artcl_ch)
 				}
 			}()
 		}
@@ -596,34 +600,36 @@ func (self *Gwyneth) ReFilter(src_id *model.Id, limit int64) error {
 func action_filter(msn *task.Mission, args ...any) {
 	defer msn.Done()
 
-	action := args[0].(*filter.Action)
-	artcl := args[1].(*model.Article)
+	logger := args[0].(*slog.Logger)
+	action := args[1].(*filter.Action)
+	artcl := args[2].(*model.Article)
 
 	if task.IsCanceled(msn) {
-		slog.Info("the filter's action is canceld")
+		logger.Info("the filter's action is canceld")
 		return
 	}
-	if err := action.Do(msn.New(), artcl); err != nil {
-		slog.Error("failed: execute filter: %s", err)
+	if err := action.Do(msn.New(), logger, artcl); err != nil {
+		logger.Error("failed: execute filter: %s", err)
 	}
 }
 
 func rss_collector(msn *task.Mission, args ...any) {
 	defer msn.Done()
 
-	src := args[0].(*model.Source)
-	artcl_ch := args[1].(chan *model.Article)
+	logger := args[0].(*slog.Logger)
+	src := args[1].(*model.Source)
+	artcl_ch := args[2].(chan *model.Article)
 
 	if task.IsCanceled(msn) {
-		slog.Info("the collector of '%s' is canceld", src.Title())
+		logger.Info("the collector of '%s' is canceld", src.Title())
 		return
 	}
 
-	slog.Debug("the collector of '%s' is running... :'%s'", src.Title(), src.Value())
-	if err := rss.GetFeed(msn.New(), src, artcl_ch); err != nil {
-		slog.Warn("cannot collect '%s/%s': %s", src.Title(), src.Value(), err)
+	logger.Debug("the collector of '%s' is running... :'%s'", src.Title(), src.Value())
+	if err := rss.GetFeed(msn.New(), logger, src, artcl_ch); err != nil {
+		logger.Warn("cannot collect '%s/%s': %s", src.Title(), src.Value(), err)
 	}
-	slog.Debug("the collector of '%s' done!!!", src.Title())
+	logger.Debug("the collector of '%s' done!!!", src.Title())
 }
 
 func split_src(size int, src_s []*model.Source) [][]*model.Source {

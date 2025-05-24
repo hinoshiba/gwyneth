@@ -53,9 +53,9 @@ func (self *Action) ConvertExternal() *external.Action {
 	}
 }
 
-func (self *Action) Do(msn *task.Mission, artcl *model.Article) error {
+func (self *Action) Do(msn *task.Mission, logger *slog.Logger, artcl *model.Article) error {
 	defer msn.Done()
-	slog.Debug("call '%s' '%s'", self.name, self.cmd)
+	logger.Debug("call '%s' '%s'", self.name, self.cmd)
 
 	args := strings.SplitN(self.cmd, " ", 30)
 	c := args[0]
@@ -128,6 +128,6 @@ func (self *Action) Do(msn *task.Mission, artcl *model.Article) error {
 
 		return fmt.Errorf("%s: %s", err, errout)
 	}
-	slog.Debug("%s successed: %s, %s", self.cmd, output, errout)
+	logger.Debug("%s successed: %s, %s", self.cmd, output, errout)
 	return nil
 }

@@ -37,7 +37,7 @@ func gwyneth_cmd() error {
 
 	go watch_sighup(msn.New(), lm)
 
-	g, err := gwyneth.New(msn.New(), Config)
+	g, err := gwyneth.New(msn.New(), lm, Config)
 	if err != nil {
 		return err
 	}
