@@ -11,10 +11,10 @@ import (
 import (
 	"github.com/hinoshiba/gwyneth/config"
 	"github.com/hinoshiba/gwyneth/consts"
-	"github.com/hinoshiba/gwyneth/structs"
+	"github.com/hinoshiba/gwyneth/model"
 )
 
-func makeFeed(cfg *config.Feed, as []*structs.Article) (*feeds.Feed, error) {
+func makeFeed(cfg *config.Feed, as []*model.Article) (*feeds.Feed, error) {
 	var lt int64 = 0
 
 	items := make([]*feeds.Item, len(as), len(as))

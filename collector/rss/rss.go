@@ -12,10 +12,10 @@ import (
 
 import (
 	"github.com/hinoshiba/gwyneth/slog"
-	"github.com/hinoshiba/gwyneth/structs"
+	"github.com/hinoshiba/gwyneth/model"
 )
 
-func GetFeed(msn *task.Mission, src *structs.Source, artcl_ch chan <- *structs.Article) error {
+func GetFeed(msn *task.Mission, src *model.Source, artcl_ch chan <- *model.Article) error {
 	defer msn.Done()
 
 	fp := gofeed.NewParser()
@@ -42,9 +42,9 @@ func GetFeed(msn *task.Mission, src *structs.Source, artcl_ch chan <- *structs.A
 			continue
 		}
 
-		artcl := structs.NewArticle(nil, src, item.Title, item.Description, item.Link, pubdate.Unix(), string(raw_j))
+		artcl := model.NewArticle(nil, src, item.Title, item.Description, item.Link, pubdate.Unix(), string(raw_j))
 
-		go func(msn *task.Mission, artcl *structs.Article) {
+		go func(msn *task.Mission, artcl *model.Article) {
 			defer msn.Done()
 
 			select {

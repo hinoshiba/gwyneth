@@ -1,4 +1,4 @@
-package structs
+package model
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 )
 
 import (
-	"github.com/hinoshiba/gwyneth/structs/external"
+	"github.com/hinoshiba/gwyneth/model/external"
 )
 
 type Id struct {

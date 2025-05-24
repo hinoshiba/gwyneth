@@ -22,8 +22,8 @@ import (
 	"github.com/hinoshiba/gwyneth/slog"
 	"github.com/hinoshiba/gwyneth/consts"
 	"github.com/hinoshiba/gwyneth/config"
-	"github.com/hinoshiba/gwyneth/structs"
-	"github.com/hinoshiba/gwyneth/structs/external"
+	"github.com/hinoshiba/gwyneth/model"
+	"github.com/hinoshiba/gwyneth/model/external"
 )
 
 func init() {
@@ -253,7 +253,7 @@ func getHandlerGetSourceTypes(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
 		id_base := c.Query("id")
 		if id_base != "" {
-			id, err := structs.ParseStringId(id_base)
+			id, err := model.ParseStringId(id_base)
 			if err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
@@ -295,7 +295,7 @@ func getHandlerDeleteSourceType(g *gwyneth.Gwyneth) func(*gin.Context) {
 		}
 		slog.Debug("DeleteSourceType: request is '%v'", st)
 
-		id, err := structs.ParseStringId(st.Id)
+		id, err := model.ParseStringId(st.Id)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -320,7 +320,7 @@ func getHandlerAddSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 		}
 		slog.Debug("AddSource: request is '%v'", src)
 
-		src_type_id, err := structs.ParseStringId(src.Type.Id)
+		src_type_id, err := model.ParseStringId(src.Type.Id)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -340,7 +340,7 @@ func getHandlerGetSources(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
 		id_base := c.Query("id")
 		if id_base != "" {
-			id, err := structs.ParseStringId(id_base)
+			id, err := model.ParseStringId(id_base)
 			if err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
@@ -378,7 +378,7 @@ func getHandlerRemoveSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		id, err := structs.ParseStringId(src.Id)
+		id, err := model.ParseStringId(src.Id)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -403,7 +403,7 @@ func getHandlerAddArticle(g *gwyneth.Gwyneth) func(*gin.Context) {
 		}
 		slog.Debug("AddArticle: request is '%v'", article)
 
-		src_id, err := structs.ParseStringId(article.Src.Id)
+		src_id, err := model.ParseStringId(article.Src.Id)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("cannot parse src id('%s'): %s", article.Src.Id, err)})
 			return
@@ -432,7 +432,7 @@ func getHandlerRemoveArticle(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		id, err := structs.ParseStringId(article.Id)
+		id, err := model.ParseStringId(article.Id)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -498,9 +498,9 @@ func getHandlerLookupArticles(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Co
 			return
 		}
 
-		src_ids := []*structs.Id{}
+		src_ids := []*model.Id{}
 		for _, src_id_base := range src_id_base_s {
-			src_id, err := structs.ParseStringId(src_id_base)
+			src_id, err := model.ParseStringId(src_id_base)
 			if err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("cannot parse src id('%s'): %s", src_id_base, err)})
 				return
@@ -523,7 +523,7 @@ func getHandlerLookupArticles(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Co
 func getHandlerGetFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
 		id_base := c.Param("id")
-		src_id, err := structs.ParseStringId(id_base)
+		src_id, err := model.ParseStringId(id_base)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -552,7 +552,7 @@ func getHandlerGetFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Context) 
 func getHandlerPostFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
 		id_base := c.Param("id")
-		src_id, err := structs.ParseStringId(id_base)
+		src_id, err := model.ParseStringId(id_base)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -569,7 +569,7 @@ func getHandlerPostFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Context)
 		}
 		slog.Debug("BindFeed: request is '%v'", article)
 
-		article_id, err := structs.ParseStringId(article.Id)
+		article_id, err := model.ParseStringId(article.Id)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("cannot parse article id('%s'): %s", article.Id, err)})
 			return
@@ -589,7 +589,7 @@ func getHandlerPostFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Context)
 func getHandlerDeleteFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
 		id_base := c.Param("id")
-		src_id, err := structs.ParseStringId(id_base)
+		src_id, err := model.ParseStringId(id_base)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -606,7 +606,7 @@ func getHandlerDeleteFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Contex
 		}
 		slog.Debug("UnBindFeed: request is '%v'", article)
 
-		article_id, err := structs.ParseStringId(article.Id)
+		article_id, err := model.ParseStringId(article.Id)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("cannot parse article id('%s'): %s", article.Id, err)})
 			return
@@ -623,7 +623,7 @@ func getHandlerDeleteFeed(cfg *config.Feed, g *gwyneth.Gwyneth) func(*gin.Contex
 	}
 }
 
-func doResponseFeed(cfg *config.Feed, c *gin.Context, as []*structs.Article, feed_type string) {
+func doResponseFeed(cfg *config.Feed, c *gin.Context, as []*model.Article, feed_type string) {
 	f, err := makeFeed(cfg, as)
 	if err != nil {
 		err_msg := fmt.Sprintf("cannot make feed: %s", err)
@@ -672,7 +672,7 @@ func getHandlerGetActions(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
 		id_base := c.Query("id")
 		if id_base != "" {
-			id, err := structs.ParseStringId(id_base)
+			id, err := model.ParseStringId(id_base)
 			if err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
@@ -729,7 +729,7 @@ func getHandlerDeleteAction(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		id, err := structs.ParseStringId(action.Id)
+		id, err := model.ParseStringId(action.Id)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -749,7 +749,7 @@ func getHandlerGetFilters(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
 		id_base := c.Query("id")
 		if id_base != "" {
-			id, err := structs.ParseStringId(id_base)
+			id, err := model.ParseStringId(id_base)
 			if err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
@@ -788,7 +788,7 @@ func getHandlerAddFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 		}
 		slog.Debug("AddFilter: request is '%v'", f)
 
-		action_id, err := structs.ParseStringId(f.Action.Id)
+		action_id, err := model.ParseStringId(f.Action.Id)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -813,12 +813,12 @@ func getHandlerUpdateFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		id, err := structs.ParseStringId(f.Id)
+		id, err := model.ParseStringId(f.Id)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		action_id, err := structs.ParseStringId(f.Action.Id)
+		action_id, err := model.ParseStringId(f.Action.Id)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -842,7 +842,7 @@ func getHandlerDeleteFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		id, err := structs.ParseStringId(f.Id)
+		id, err := model.ParseStringId(f.Id)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -861,7 +861,7 @@ func getHandlerDeleteFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 func getHandlerGetSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
 		id_base := c.Param("id")
-		id, err := structs.ParseStringId(id_base)
+		id, err := model.ParseStringId(id_base)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -880,7 +880,7 @@ func getHandlerGetSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 func getHandlerPauseSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
 		id_base := c.Param("id")
-		id, err := structs.ParseStringId(id_base)
+		id, err := model.ParseStringId(id_base)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -898,7 +898,7 @@ func getHandlerPauseSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 func getHandlerResumeSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
 		id_base := c.Param("id")
-		id, err := structs.ParseStringId(id_base)
+		id, err := model.ParseStringId(id_base)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -917,7 +917,7 @@ func getHandlerResumeSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 func getHandlerReFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
 		id_base := c.Param("id")
-		id, err := structs.ParseStringId(id_base)
+		id, err := model.ParseStringId(id_base)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -947,7 +947,7 @@ func getHandlerReFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 func getHandlerBindFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
 		id_base := c.Param("id")
-		id, err := structs.ParseStringId(id_base)
+		id, err := model.ParseStringId(id_base)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -960,7 +960,7 @@ func getHandlerBindFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 		}
 		slog.Debug("BindFilter: request is '%v'", f)
 
-		f_id, err := structs.ParseStringId(f.Id)
+		f_id, err := model.ParseStringId(f.Id)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -987,7 +987,7 @@ func getHandlerBindFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 func getHandlerGetFilterOnSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
 		id_base := c.Param("id")
-		id, err := structs.ParseStringId(id_base)
+		id, err := model.ParseStringId(id_base)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -1010,7 +1010,7 @@ func getHandlerGetFilterOnSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 func getHandlerUnBindFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
 		id_base := c.Param("id")
-		id, err := structs.ParseStringId(id_base)
+		id, err := model.ParseStringId(id_base)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -1023,7 +1023,7 @@ func getHandlerUnBindFilter(g *gwyneth.Gwyneth) func(*gin.Context) {
 		}
 		slog.Debug("BindFilter: request is '%v'", f)
 
-		f_id, err := structs.ParseStringId(f.Id)
+		f_id, err := model.ParseStringId(f.Id)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
