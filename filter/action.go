@@ -3,7 +3,6 @@ package filter
 import (
 	"os/exec"
 	"fmt"
-	"log/slog"
 	"bufio"
 	"strings"
 	"syscall"
@@ -15,17 +14,18 @@ import (
 )
 
 import (
-	"github.com/hinoshiba/gwyneth/structs"
-	"github.com/hinoshiba/gwyneth/structs/external"
+	"github.com/hinoshiba/gwyneth/slog"
+	"github.com/hinoshiba/gwyneth/model"
+	"github.com/hinoshiba/gwyneth/model/external"
 )
 
 type Action struct {
-	id   *structs.Id
+	id   *model.Id
 	name string
 	cmd  string
 }
 
-func NewAction(id *structs.Id, name string, cmd string) *Action {
+func NewAction(id *model.Id, name string, cmd string) *Action {
 	return &Action{
 		id: id,
 		name: name,
@@ -33,7 +33,7 @@ func NewAction(id *structs.Id, name string, cmd string) *Action {
 	}
 }
 
-func (self *Action) Id() *structs.Id {
+func (self *Action) Id() *model.Id {
 	return self.id
 }
 
@@ -53,9 +53,9 @@ func (self *Action) ConvertExternal() *external.Action {
 	}
 }
 
-func (self *Action) Do(msn *task.Mission, artcl *structs.Article) error {
+func (self *Action) Do(msn *task.Mission, logger *slog.Logger, artcl *model.Article) error {
 	defer msn.Done()
-	slog.Debug(fmt.Sprintf("call '%s' '%s'", self.name, self.cmd))
+	logger.Debug("call '%s' '%s'", self.name, self.cmd)
 
 	args := strings.SplitN(self.cmd, " ", 30)
 	c := args[0]
@@ -128,6 +128,6 @@ func (self *Action) Do(msn *task.Mission, artcl *structs.Article) error {
 
 		return fmt.Errorf("%s: %s", err, errout)
 	}
-	slog.Debug(fmt.Sprintf("%s successed: %s, %s", self.cmd, output, errout))
+	logger.Debug("%s successed: %s, %s", self.cmd, output, errout)
 	return nil
 }

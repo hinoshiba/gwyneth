@@ -2,9 +2,10 @@ package main
 
 import (
 	"os"
+	"os/signal"
 	"fmt"
-	"log/slog"
 	"flag"
+	"syscall"
 )
 
 import (
@@ -13,6 +14,7 @@ import (
 
 import (
 	"github.com/hinoshiba/gwyneth"
+	"github.com/hinoshiba/gwyneth/slog"
 	"github.com/hinoshiba/gwyneth/http"
 	"github.com/hinoshiba/gwyneth/config"
 )
@@ -23,10 +25,19 @@ var (
 
 func gwyneth_cmd() error {
 	msn := task.NewMission()
+
+	lm, err := slog.New(msn.New(), Config.Log)
+	if err != nil {
+		return err
+	}
+	defer lm.Close()
+
 	slog.Info("gwyneth starting...")
 	defer slog.Info("gwyneth ending...")
 
-	g, err := gwyneth.New(msn.New(), Config)
+	go watch_sighup(msn.New(), lm)
+
+	g, err := gwyneth.New(msn.New(), lm, Config)
 	if err != nil {
 		return err
 	}
@@ -57,16 +68,20 @@ func init() {
 		die("load error: %s", err)
 	}
 	Config = cfg
+}
 
-	slog.SetDefault(
-		slog.New(
-			slog.NewTextHandler(
-				os.Stdout,
-				&slog.HandlerOptions{Level: Config.Log.GetSlogLevel()},
-			),
-		),
-	)
-	slog.Info(fmt.Sprintf("LogLevel: %s", cfg.Log.Level))
+func watch_sighup(msn *task.Mission, lm *slog.LogManager) {
+	defer msn.Done()
+
+	sig_ch := make(chan os.Signal, 1)
+	signal.Notify(sig_ch, syscall.SIGHUP)
+
+	select {
+	case <- msn.RecvCancel():
+		return
+	case <- sig_ch:
+		lm.Restart()
+	}
 }
 
 func die(s string, msg ...any) {

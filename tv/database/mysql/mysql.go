@@ -2,7 +2,6 @@ package mysql
 
 import (
 	"fmt"
-	"log/slog"
 	"sync"
 	"time"
 	"strings"
@@ -15,8 +14,9 @@ import (
 )
 
 import (
+	"github.com/hinoshiba/gwyneth/slog"
 	"github.com/hinoshiba/gwyneth/config"
-	"github.com/hinoshiba/gwyneth/structs"
+	"github.com/hinoshiba/gwyneth/model"
 	"github.com/hinoshiba/gwyneth/filter"
 
 	"github.com/hinoshiba/gwyneth/tv/errors"
@@ -78,17 +78,15 @@ func (self *Session) connect(db_auth string) error {
 
 		db, err := sql.Open("mysql", db_auth)
 		if err != nil {
-			msg := fmt.Sprintf("Failed: connect to DB: %s, trying reconnect (%d/%d) after %d sec.",
+			slog.Warn("Failed: connect to DB: %s, trying reconnect (%d/%d) after %d sec.",
 																		err, cnt, MAX_RETRY, wait_sec)
-			slog.Warn(msg)
 			continue
 		}
 		self.db = db
 
 		if err := self.init(); err != nil {
-			msg := fmt.Sprintf("Failed: connect to a DB: %s, trying reconnect (%d/%d) after %d sec.",
-											err, cnt, MAX_RETRY, wait_sec)
-			slog.Warn(msg)
+			slog.Warn("Failed: connect to a DB: %s, trying reconnect (%d/%d) after %d sec.",
+																		err, cnt, MAX_RETRY, wait_sec)
 			continue
 		}
 
@@ -162,13 +160,13 @@ func (self *Session) init() error {
 	}
 
 	for _, name := range order {
-		structs, ok := d[name]
+		model, ok := d[name]
 		if !ok {
 			continue
 		}
 
 		param := "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci"
-		query := fmt.Sprintf("CREATE TABLE %s (%s) %s", name, structs, param)
+		query := fmt.Sprintf("CREATE TABLE %s (%s) %s", name, model, param)
 		if _, err := self.db.ExecContext(self.msn.AsContext(), query); err != nil {
 			return fmt.Errorf("%s: '%s'", err, query)
 		}
@@ -176,11 +174,11 @@ func (self *Session) init() error {
 	return nil
 }
 
-func (self *Session) AddSourceType(name string, command string, is_user_creation bool) (*structs.SourceType, error) {
+func (self *Session) AddSourceType(name string, command string, is_user_creation bool) (*model.SourceType, error) {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
-	id := structs.NewId(nil)
+	id := model.NewId(nil)
 
 	_, err := self.db.ExecContext(self.msn.AsContext(),
 		"INSERT INTO source_type (id, name, command, user_create) VALUES (?, ?, ?, ?)",
@@ -189,10 +187,10 @@ func (self *Session) AddSourceType(name string, command string, is_user_creation
 		return nil, err
 	}
 
-	return structs.NewSourceType(id, name, command, is_user_creation), nil
+	return model.NewSourceType(id, name, command, is_user_creation), nil
 }
 
-func (self *Session) GetSourceTypes() ([]*structs.SourceType, error) {
+func (self *Session) GetSourceTypes() ([]*model.SourceType, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
@@ -202,7 +200,7 @@ func (self *Session) GetSourceTypes() ([]*structs.SourceType, error) {
 	}
 	defer rows.Close()
 
-	source_types := []*structs.SourceType{}
+	source_types := []*model.SourceType{}
 	for rows.Next() {
 		var id_base []byte
 		var name string
@@ -213,8 +211,8 @@ func (self *Session) GetSourceTypes() ([]*structs.SourceType, error) {
 		if err != nil {
 			return nil, err
 		}
-		id := structs.NewId(id_base)
-		st := structs.NewSourceType(id, name, cmd, user_create)
+		id := model.NewId(id_base)
+		st := model.NewSourceType(id, name, cmd, user_create)
 
 		source_types = append(source_types, st)
 	}
@@ -225,14 +223,14 @@ func (self *Session) GetSourceTypes() ([]*structs.SourceType, error) {
 	return source_types, nil
 }
 
-func (self *Session) GetSourceType(id *structs.Id) (*structs.SourceType, error) {
+func (self *Session) GetSourceType(id *model.Id) (*model.SourceType, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
 	return self.getSourceType(id)
 }
 
-func (self *Session) getSourceType(id *structs.Id) (*structs.SourceType, error) {
+func (self *Session) getSourceType(id *model.Id) (*model.SourceType, error) {
 	rows, err := self.db.Query("SELECT * FROM source_type WHERE id = ? LIMIT 1", id.Value())
 	if err != nil {
 		return nil, err
@@ -248,8 +246,8 @@ func (self *Session) getSourceType(id *structs.Id) (*structs.SourceType, error) 
 		if err = rows.Scan(&id_base, &name, &cmd, &user_create); err != nil {
 			return nil, err
 		}
-		id = structs.NewId(id_base)
-		st := structs.NewSourceType(id, name, cmd, user_create)
+		id = model.NewId(id_base)
+		st := model.NewSourceType(id, name, cmd, user_create)
 
 		if err = rows.Err(); err != nil {
 			return nil, err
@@ -259,7 +257,7 @@ func (self *Session) getSourceType(id *structs.Id) (*structs.SourceType, error) 
 	return nil, fmt.Errorf("cannot find the source type.")
 }
 
-func (self *Session) DeleteSourceType(id *structs.Id) error {
+func (self *Session) DeleteSourceType(id *model.Id) error {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
@@ -272,11 +270,11 @@ func (self *Session) DeleteSourceType(id *structs.Id) error {
 	return err
 }
 
-func (self *Session) AddSource(title string, src_type_id *structs.Id, source string) (*structs.Source, error) {
+func (self *Session) AddSource(title string, src_type_id *model.Id, source string) (*model.Source, error) {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
-	id := structs.NewId(nil)
+	id := model.NewId(nil)
 
 	_, err := self.db.ExecContext(self.msn.AsContext(),
 		"INSERT INTO source (id, title, type, source) VALUES (?, ?, ?, ?)",
@@ -288,7 +286,7 @@ func (self *Session) AddSource(title string, src_type_id *structs.Id, source str
 	return self.getSource(id)
 }
 
-func (self *Session) GetSources() ([]*structs.Source, error) {
+func (self *Session) GetSources() ([]*model.Source, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
@@ -298,8 +296,8 @@ func (self *Session) GetSources() ([]*structs.Source, error) {
 	}
 	defer rows.Close()
 
-	srcs := []*structs.Source{}
-	st_cache := make(map[string]*structs.SourceType)
+	srcs := []*model.Source{}
+	st_cache := make(map[string]*model.SourceType)
 	for rows.Next() {
 		var id_base []byte
 		var title string
@@ -311,8 +309,8 @@ func (self *Session) GetSources() ([]*structs.Source, error) {
 		if err != nil {
 			return nil, err
 		}
-		id := structs.NewId(id_base)
-		source_type_id := structs.NewId(source_type_id_base)
+		id := model.NewId(id_base)
+		source_type_id := model.NewId(source_type_id_base)
 
 		st, ok := st_cache[source_type_id.String()]
 		if !ok {
@@ -325,7 +323,7 @@ func (self *Session) GetSources() ([]*structs.Source, error) {
 			st_cache[source_type_id.String()] = st
 		}
 
-		srcs = append(srcs, structs.NewSource(id, title, st, source, pause))
+		srcs = append(srcs, model.NewSource(id, title, st, source, pause))
 	}
 
 	if err := rows.Err(); err != nil {
@@ -334,7 +332,7 @@ func (self *Session) GetSources() ([]*structs.Source, error) {
 	return srcs, nil
 }
 
-func (self *Session) FindSource(kw string) ([]*structs.Source, error) {
+func (self *Session) FindSource(kw string) ([]*model.Source, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
@@ -344,8 +342,8 @@ func (self *Session) FindSource(kw string) ([]*structs.Source, error) {
 	}
 	defer rows.Close()
 
-	srcs := []*structs.Source{}
-	st_cache := make(map[string]*structs.SourceType)
+	srcs := []*model.Source{}
+	st_cache := make(map[string]*model.SourceType)
 	for rows.Next() {
 		var id_base []byte
 		var title string
@@ -357,8 +355,8 @@ func (self *Session) FindSource(kw string) ([]*structs.Source, error) {
 		if err != nil {
 			return nil, err
 		}
-		id := structs.NewId(id_base)
-		source_type_id := structs.NewId(source_type_id_base)
+		id := model.NewId(id_base)
+		source_type_id := model.NewId(source_type_id_base)
 
 		st, ok := st_cache[source_type_id.String()]
 		if !ok {
@@ -371,7 +369,7 @@ func (self *Session) FindSource(kw string) ([]*structs.Source, error) {
 			st_cache[source_type_id.String()] = st
 		}
 
-		srcs = append(srcs, structs.NewSource(id, title, st, source, pause))
+		srcs = append(srcs, model.NewSource(id, title, st, source, pause))
 	}
 
 	if err := rows.Err(); err != nil {
@@ -380,14 +378,14 @@ func (self *Session) FindSource(kw string) ([]*structs.Source, error) {
 	return srcs, nil
 }
 
-func (self *Session) GetSource(id *structs.Id) (*structs.Source, error) {
+func (self *Session) GetSource(id *model.Id) (*model.Source, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
 	return self.getSource(id)
 }
 
-func (self *Session) getSource(id *structs.Id) (*structs.Source, error) {
+func (self *Session) getSource(id *model.Id) (*model.Source, error) {
 	rows, err := self.db.Query("SELECT id, title, type, source, pause FROM source WHERE id = ? ORDER BY id ASC LIMIT 1", id.Value())
 	if err != nil {
 		return nil, err
@@ -404,8 +402,8 @@ func (self *Session) getSource(id *structs.Id) (*structs.Source, error) {
 		if err = rows.Scan(&id_base, &title, &source_type_id_base, &source, &pause); err != nil {
 			return nil, err
 		}
-		id = structs.NewId(id_base)
-		source_type_id := structs.NewId(source_type_id_base)
+		id = model.NewId(id_base)
+		source_type_id := model.NewId(source_type_id_base)
 
 		st, err := self.getSourceType(source_type_id)
 		if err != nil {
@@ -415,12 +413,12 @@ func (self *Session) getSource(id *structs.Id) (*structs.Source, error) {
 		if err = rows.Err(); err != nil {
 			return nil, err
 		}
-		return structs.NewSource(id, title, st, source, pause), nil
+		return model.NewSource(id, title, st, source, pause), nil
 	}
 	return nil, fmt.Errorf("cannot find the source.")
 }
 
-func (self *Session) RemoveSource(id *structs.Id) error {
+func (self *Session) RemoveSource(id *model.Id) error {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
@@ -433,7 +431,7 @@ func (self *Session) RemoveSource(id *structs.Id) error {
 	return err
 }
 
-func (self *Session) PauseSource(id *structs.Id) error {
+func (self *Session) PauseSource(id *model.Id) error {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
@@ -446,7 +444,7 @@ func (self *Session) PauseSource(id *structs.Id) error {
 	return err
 }
 
-func (self *Session) ResumeSource(id *structs.Id) error {
+func (self *Session) ResumeSource(id *model.Id) error {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
@@ -459,7 +457,7 @@ func (self *Session) ResumeSource(id *structs.Id) error {
 	return err
 }
 
-func (self *Session) getArticle(id *structs.Id) (*structs.Article, error) {
+func (self *Session) getArticle(id *model.Id) (*model.Article, error) {
 	as, err := self.query4article("SELECT id, src_id, title, body, link, timestamp, raw FROM article WHERE id = ? AND disable <> 1 ORDER BY id ASC LIMIT 1", id.Value())
 	if err != nil {
 		return nil, err
@@ -467,7 +465,7 @@ func (self *Session) getArticle(id *structs.Id) (*structs.Article, error) {
 	return as[0], nil
 }
 
-func (self *Session) AddArticle(title string, body string, link string, unixtime int64, raw string, src_id *structs.Id) (*structs.Article, error){
+func (self *Session) AddArticle(title string, body string, link string, unixtime int64, raw string, src_id *model.Id) (*model.Article, error){
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
@@ -480,7 +478,7 @@ func (self *Session) AddArticle(title string, body string, link string, unixtime
 		return as[0], errors.ERR_ALREADY_EXIST_ARTICLE
 	}
 
-	id := structs.NewId(nil)
+	id := model.NewId(nil)
 	timestamp := time.Unix(unixtime, 0)
 	_, err = self.db.ExecContext(self.msn.AsContext(),
 		"INSERT INTO article (id, src_id, title, body, link, timestamp, raw) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -495,7 +493,7 @@ func (self *Session) AddArticle(title string, body string, link string, unixtime
 	return self.getArticle(id)
 }
 
-func (self *Session) LookupArticles(t_kw string, b_kw string, src_ids []*structs.Id, start int64, end int64, limit int64) ([]*structs.Article, error) {
+func (self *Session) LookupArticles(t_kw string, b_kw string, src_ids []*model.Id, start int64, end int64, limit int64) ([]*model.Article, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
@@ -540,12 +538,12 @@ func (self *Session) LookupArticles(t_kw string, b_kw string, src_ids []*structs
 		args = append(args, 30)
 	}
 
-	slog.Debug(fmt.Sprintf("%s, %v", q, args))
+	slog.Debug("%s, %v", q, args)
 
 	return self.query4article(q, args...)
 }
 
-func (self *Session) RemoveArticle(id *structs.Id) error {
+func (self *Session) RemoveArticle(id *model.Id) error {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
@@ -557,7 +555,7 @@ func (self *Session) RemoveArticle(id *structs.Id) error {
 	return err
 }
 
-func (self *Session) GetFeed(src_id *structs.Id, limit int64) ([]*structs.Article, error) {
+func (self *Session) GetFeed(src_id *model.Id, limit int64) ([]*model.Article, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
@@ -581,7 +579,7 @@ LIMIT ?
 	return self.query4article(q, src_id.Value(), limit)
 }
 
-func (self *Session) RemoveFeedEntry(src_id *structs.Id, article_id *structs.Id) error {
+func (self *Session) RemoveFeedEntry(src_id *model.Id, article_id *model.Id) error {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
@@ -590,29 +588,29 @@ func (self *Session) RemoveFeedEntry(src_id *structs.Id, article_id *structs.Id)
 	return err
 }
 
-func (self *Session) BindFeed(src_id *structs.Id, article_id *structs.Id) error {
+func (self *Session) BindFeed(src_id *model.Id, article_id *model.Id) error {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
 	return self.addFeed(src_id, article_id)
 }
 
-func (self *Session) addFeed(src_id *structs.Id, article_id *structs.Id) error {
+func (self *Session) addFeed(src_id *model.Id, article_id *model.Id) error {
 	_, err := self.db.ExecContext(self.msn.AsContext(),
 					"INSERT INTO feed (src_id, article_id) VALUES (?, ?)",
 											src_id.Value(), article_id.Value())
 	return err
 }
 
-func (self *Session) query4article(q string, args ...any) ([]*structs.Article, error) {
+func (self *Session) query4article(q string, args ...any) ([]*model.Article, error) {
 	rows, err := self.db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	articles := []*structs.Article{}
-	src_cache := make(map[string]*structs.Source)
+	articles := []*model.Article{}
+	src_cache := make(map[string]*model.Source)
 	for rows.Next() {
 		var id_base []byte
 		var src_id_base []byte
@@ -625,8 +623,8 @@ func (self *Session) query4article(q string, args ...any) ([]*structs.Article, e
 		if err = rows.Scan(&id_base, &src_id_base, &title, &body, &link, &t_stamp, &raw); err != nil {
 			return nil, err
 		}
-		id := structs.NewId(id_base)
-		src_id := structs.NewId(src_id_base)
+		id := model.NewId(id_base)
+		src_id := model.NewId(src_id_base)
 
 		src, ok := src_cache[src_id.String()]
 		if !ok {
@@ -642,7 +640,7 @@ func (self *Session) query4article(q string, args ...any) ([]*structs.Article, e
 		if err = rows.Err(); err != nil {
 			return nil, err
 		}
-		articles = append(articles, structs.NewArticle(id, src, title, body, link, t_stamp.Unix(), raw))
+		articles = append(articles, model.NewArticle(id, src, title, body, link, t_stamp.Unix(), raw))
 	}
 
 	if err := rows.Err(); err != nil {
@@ -655,7 +653,7 @@ func (self *Session) AddAction(name string, cmd string) (*filter.Action, error) 
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
-	id := structs.NewId(nil)
+	id := model.NewId(nil)
 
 	_, err := self.db.ExecContext(self.msn.AsContext(),
 		"INSERT INTO action (id, name, command) VALUES (?, ?, ?)", id.Value(), name, cmd)
@@ -686,7 +684,7 @@ func (self *Session) GetActions() ([]*filter.Action, error) {
 		if err != nil {
 			return nil, err
 		}
-		id := structs.NewId(id_base)
+		id := model.NewId(id_base)
 		action := filter.NewAction(id, name, cmd)
 
 		actions = append(actions, action)
@@ -698,14 +696,14 @@ func (self *Session) GetActions() ([]*filter.Action, error) {
 	return actions, nil
 }
 
-func (self *Session) GetAction(id *structs.Id) (*filter.Action, error) {
+func (self *Session) GetAction(id *model.Id) (*filter.Action, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
 	return self.getAction(id)
 }
 
-func (self *Session) getAction(id *structs.Id) (*filter.Action, error) {
+func (self *Session) getAction(id *model.Id) (*filter.Action, error) {
 	rows, err := self.db.Query("SELECT * FROM action WHERE id = ?  ORDER BY id ASC LIMIT 1", id.Value())
 	if err != nil {
 		return nil, err
@@ -720,7 +718,7 @@ func (self *Session) getAction(id *structs.Id) (*filter.Action, error) {
 		if err = rows.Scan(&id_base, &name, &cmd); err != nil {
 			return nil, err
 		}
-		id = structs.NewId(id_base)
+		id = model.NewId(id_base)
 		action := filter.NewAction(id, name, cmd)
 
 		if err = rows.Err(); err != nil {
@@ -731,7 +729,7 @@ func (self *Session) getAction(id *structs.Id) (*filter.Action, error) {
 	return nil, fmt.Errorf("cannot find the action")
 }
 
-func (self *Session) DeleteAction(id *structs.Id) error {
+func (self *Session) DeleteAction(id *model.Id) error {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
@@ -744,11 +742,11 @@ func (self *Session) DeleteAction(id *structs.Id) error {
 	return err
 }
 
-func (self *Session) AddFilter(title string, regex_title bool, body string, regex_body bool, action_id *structs.Id) (*filter.Filter, error) {
+func (self *Session) AddFilter(title string, regex_title bool, body string, regex_body bool, action_id *model.Id) (*filter.Filter, error) {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
-	id := structs.NewId(nil)
+	id := model.NewId(nil)
 
 	_, err := self.db.ExecContext(self.msn.AsContext(),
 		"INSERT INTO filter (id, val_title, is_regex_title, val_body, is_regex_body, action_id) VALUES (?, ?, ?, ?, ?, ?)",
@@ -760,7 +758,7 @@ func (self *Session) AddFilter(title string, regex_title bool, body string, rege
 	return self.getFilter(id)
 }
 
-func (self *Session) UpdateFilterAction(id *structs.Id, action_id *structs.Id) (*filter.Filter, error) {
+func (self *Session) UpdateFilterAction(id *model.Id, action_id *model.Id) (*filter.Filter, error) {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
@@ -776,14 +774,14 @@ func (self *Session) UpdateFilterAction(id *structs.Id, action_id *structs.Id) (
 	return self.getFilter(id)
 }
 
-func (self *Session) GetFilter(id *structs.Id) (*filter.Filter, error) {
+func (self *Session) GetFilter(id *model.Id) (*filter.Filter, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
 	return self.getFilter(id)
 }
 
-func (self *Session) getFilter(id *structs.Id) (*filter.Filter, error) {
+func (self *Session) getFilter(id *model.Id) (*filter.Filter, error) {
 	rows, err := self.db.Query("SELECT * FROM filter WHERE id = ?  ORDER BY id ASC LIMIT 1", id.Value())
 	if err != nil {
 		return nil, err
@@ -801,9 +799,9 @@ func (self *Session) getFilter(id *structs.Id) (*filter.Filter, error) {
 		if err != nil {
 			return nil, err
 		}
-		id := structs.NewId(id_base)
+		id := model.NewId(id_base)
 
-		action_id := structs.NewId(action_id_base)
+		action_id := model.NewId(action_id_base)
 		action, err := self.getAction(action_id)
 		if err != nil {
 			return nil, err
@@ -843,8 +841,8 @@ func (self *Session) GetFilters() ([]*filter.Filter, error) {
 		if err != nil {
 			return nil, err
 		}
-		id := structs.NewId(id_base)
-		action_id := structs.NewId(action_id_base)
+		id := model.NewId(id_base)
+		action_id := model.NewId(action_id_base)
 
 		action, ok := action_cache[action_id.String()]
 		if !ok {
@@ -866,7 +864,7 @@ func (self *Session) GetFilters() ([]*filter.Filter, error) {
 	return f_s, nil
 }
 
-func (self *Session) DeleteFilter(id *structs.Id) error {
+func (self *Session) DeleteFilter(id *model.Id) error {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
@@ -879,7 +877,7 @@ func (self *Session) DeleteFilter(id *structs.Id) error {
 	return err
 }
 
-func (self *Session) BindFilter(src_id *structs.Id, f_id *structs.Id) error {
+func (self *Session) BindFilter(src_id *model.Id, f_id *model.Id) error {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
@@ -889,7 +887,7 @@ func (self *Session) BindFilter(src_id *structs.Id, f_id *structs.Id) error {
 	return err
 }
 
-func (self *Session) UnBindFilter(src_id *structs.Id, f_id *structs.Id) error {
+func (self *Session) UnBindFilter(src_id *model.Id, f_id *model.Id) error {
 	self.mtx.Lock()
 	defer self.mtx.Unlock()
 
@@ -899,7 +897,7 @@ func (self *Session) UnBindFilter(src_id *structs.Id, f_id *structs.Id) error {
 	return err
 }
 
-func (self *Session) GetFilterOnSource(src_id *structs.Id) ([]*filter.Filter, error) {
+func (self *Session) GetFilterOnSource(src_id *model.Id) ([]*filter.Filter, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
@@ -917,7 +915,7 @@ func (self *Session) GetFilterOnSource(src_id *structs.Id) ([]*filter.Filter, er
 			return nil, err
 		}
 
-		id := structs.NewId(id_base)
+		id := model.NewId(id_base)
 		f, err := self.getFilter(id)
 		if err != nil {
 			return nil, err
@@ -931,7 +929,7 @@ func (self *Session) GetFilterOnSource(src_id *structs.Id) ([]*filter.Filter, er
 	return fs, nil
 }
 
-func (self *Session) GetSourceWithEnabledFilter(f_id *structs.Id) ([]*structs.Source, error) {
+func (self *Session) GetSourceWithEnabledFilter(f_id *model.Id) ([]*model.Source, error) {
 	self.mtx.RLock()
 	defer self.mtx.RUnlock()
 
@@ -941,7 +939,7 @@ func (self *Session) GetSourceWithEnabledFilter(f_id *structs.Id) ([]*structs.So
 	}
 	defer rows.Close()
 
-	srcs := []*structs.Source{}
+	srcs := []*model.Source{}
 	for rows.Next() {
 		var id_base        []byte
 
@@ -949,7 +947,7 @@ func (self *Session) GetSourceWithEnabledFilter(f_id *structs.Id) ([]*structs.So
 			return nil, err
 		}
 
-		id := structs.NewId(id_base)
+		id := model.NewId(id_base)
 		src, err := self.getSource(id)
 		if err != nil {
 			return nil, err

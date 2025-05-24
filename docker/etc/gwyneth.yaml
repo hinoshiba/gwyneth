@@ -17,3 +17,4 @@ feed:
   default_type: rss
 log:
   level: debug
+  dir: "/var/gwyneth/var/log"

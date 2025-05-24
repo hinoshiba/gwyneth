@@ -67,6 +67,7 @@ func (self *Config) check() error {
 
 type Log struct {
 	Level string `yaml:"level"`
+	Dir   string `yaml:"dir"`
 }
 
 func (self *Log) check() error {
@@ -75,6 +76,10 @@ func (self *Log) check() error {
 	}
 	if _, ok := LOG_LEVELS[self.Level]; !ok {
 		return fmt.Errorf("unknown log level: '%s'", self.Level)
+	}
+
+	if self.Dir == "" {
+		return fmt.Errorf("Log.Dir is Empty")
 	}
 	return nil
 }
