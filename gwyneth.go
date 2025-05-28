@@ -1,10 +1,14 @@
 package gwyneth
 
 import (
+	"os"
+	"io/ioutil"
 	"fmt"
 	"sync"
 	"time"
+	"path/filepath"
 	"regexp"
+	"encoding/json"
 )
 
 import (
@@ -32,11 +36,14 @@ type Gwyneth struct {
 	tv  *tv.TimeVortex
 	msn *task.Mission
 
+	cfg *config.Config
+
 	lm  *slog.LogManager
 	status_mgr *statusManager
 
 	new_src       *noticer
 	update_filter *noticer
+	update_action *noticer
 
 	artcl_ch     chan *model.Article
 	do_filter_ch chan *model.Article
@@ -53,6 +60,8 @@ func New(msn *task.Mission, lm *slog.LogManager, cfg *config.Config) (*Gwyneth, 
 		tv: t,
 		msn: msn,
 
+		cfg: cfg,
+
 		lm: lm,
 		status_mgr: newStatusManager(),
 
@@ -61,6 +70,7 @@ func New(msn *task.Mission, lm *slog.LogManager, cfg *config.Config) (*Gwyneth, 
 
 		new_src:       newNoticer(msn.NewCancel()),
 		update_filter: newNoticer(msn.NewCancel()),
+		update_action: newNoticer(msn.NewCancel()),
 	}
 
 	if err := self.init(); err != nil {
@@ -81,10 +91,17 @@ func (self *Gwyneth) init() error {
 	if err := self.checkAndInitSourceTypes(); err != nil {
 		return err
 	}
+
+	q_dir := filepath.Clean(self.cfg.Action.QueueDir)
+	if err := os.MkdirAll(q_dir, 0755); err != nil {
+		return err
+	}
+
 	go self.run_core(self.msn.New())
 	go self.run_article_recoder(self.msn.New())
 
 	self.new_src.Notice()
+	self.update_action.Notice()
 	self.update_filter.Notice()
 	return nil
 }
@@ -92,8 +109,9 @@ func (self *Gwyneth) init() error {
 func (self *Gwyneth) run_core(msn *task.Mission) {
 	defer msn.Done()
 
-	var msn_clctr *task.Mission
-	var msn_filtr *task.Mission
+	var msn_clctr  *task.Mission
+	var msn_filtr  *task.Mission
+	var msn_action *task.Mission
 	for {
 		select {
 		case <- msn.RecvCancel():
@@ -121,9 +139,20 @@ func (self *Gwyneth) run_core(msn *task.Mission) {
 				defer msn_filtr.Done()
 
 				if err := self.run_filter_engine(msn_filtr.New()); err !=nil {
-					slog.Error("failed: wakeup article recorder: %s", err)
+					slog.Error("failed: wakeup filter engine: %s", err)
 				}
 			}(msn_filtr)
+		case <- self.update_action.Recv():
+			if msn_action != nil {
+				msn_action.Cancel()
+			}
+
+			msn_action = msn.New()
+			go func(msn_action *task.Mission){
+				if err := self.run_action_manager(msn_action.New()); err != nil {
+					slog.Error("failed: wakeup action manager: %s", err)
+				}
+			}(msn_action)
 		}
 	}
 }
@@ -162,10 +191,6 @@ func (self *Gwyneth) run_filter_engine(msn *task.Mission) error {
 	slog.Debug("start filter engine")
 
 	f_buf := make(map[string][]*filter.Filter)
-
-	p := task.NewPool(msn.New(), FILTER_ACTION_POOL_SIZE)
-	defer p.Close()
-
 	for {
 		select {
 		case <- msn.RecvCancel():
@@ -186,17 +211,56 @@ func (self *Gwyneth) run_filter_engine(msn *task.Mission) error {
 			go func (msn *task.Mission, artcl *model.Article) {
 				defer msn.Done()
 
+				ext_artcle := artcl.ConvertExternal()
+				body, err := json.Marshal(ext_artcle)
+				if err != nil {
+					slog.Warn("failed: cannot convert string: article_id: '%s'", artcl.Id().String())
+					return
+				}
+
 				for _, f := range fs {
-					go func(msn *task.Mission, f filter.Filter) {
-						defer msn.Done()
-						if f.IsMatch(artcl) {
-							p.Do(action_filter, msn.New(), self.lm.GetActionsLogger(), f.Action(), artcl)
-						}
-					}(msn.New(), *f)
+					q, _ := self.makeActionQueuePath(f.Action())
+
+					target_path := filepath.Join(q, artcl.Id().String())
+					if _, err := os.Stat(target_path); os.IsExist(err) {
+						continue
+					}
+
+					if err := ioutil.WriteFile(target_path, body, 0644); err != nil {
+						slog.Warn("failed: cannot put %s queue: '%s'", target_path, err)
+					}
 				}
 			}(msn.New(), artcl)
 		}
 	}
+}
+
+func (self *Gwyneth) run_action_manager(msn *task.Mission) error {
+	defer msn.Done()
+
+	slog.Debug("start action manager")
+
+	p := task.NewPool(msn.New(), FILTER_ACTION_POOL_SIZE)
+	defer p.Close()
+
+	actions, err := self.getActions()
+	if err != nil {
+		return err
+	}
+
+	for _, action := range actions {
+		q, dlq := self.makeActionQueuePath(action)
+
+		if err := os.MkdirAll(q, 0755); err != nil {
+			return err
+		}
+		if err := os.MkdirAll(dlq, 0755); err != nil {
+			return err
+		}
+	}
+	return nil
+
+	//p.Do(action_filter, msn.New(), self.lm.GetActionsLogger(), f.Action(), artcl) // TODO: WIP
 }
 
 func (self *Gwyneth) run_rss_collector(msn *task.Mission) error {
@@ -294,6 +358,15 @@ func (self *Gwyneth) checkAndInitSourceTypes() error {
 		self.default_source_type[st.Id().String()] = struct{}{}
 	}
 	return nil
+}
+
+func (self *Gwyneth) makeActionQueuePath(a *filter.Action) (string, string) {
+	base := filepath.Join(self.cfg.Action.QueueDir, a.Id().String())
+
+	new_q := filepath.Join(base, "new")
+	dl_q := filepath.Join(base, "deadletter")
+
+	return new_q, dl_q
 }
 
 func (self *Gwyneth) AddSourceType(name string, cmd string, is_user_creation bool) (*model.SourceType, error) {

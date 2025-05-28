@@ -47,6 +47,7 @@ type Config struct {
 	Http     *Http     `yaml:"http"`
 	Feed     *Feed     `yaml:"feed"`
 	Log      *Log      `yaml:"log"`
+	Action   *Action   `yaml:"action"`
 }
 
 func (self *Config) check() error {
@@ -61,6 +62,20 @@ func (self *Config) check() error {
 	}
 	if err := self.Log.check(); err != nil {
 		return err
+	}
+	if err := self.Action.check(); err != nil {
+		return err
+	}
+	return nil
+}
+
+type Action struct {
+	QueueDir string `yaml:"queue_dir"`
+}
+
+func (self *Action) check() error {
+	if self.QueueDir == "" {
+		return fmt.Errorf("Action.QueueDir is Empty")
 	}
 	return nil
 }

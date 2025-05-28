@@ -17,4 +17,6 @@ feed:
   default_type: rss
 log:
   level: debug
-  dir: "/var/gwyneth/var/log"
+  dir: "/var/gwyneth/var/log/"
+action:
+  queue_dir: "/var/gwyneth/var/action/queue/"
