@@ -2,6 +2,7 @@ package gwyneth
 
 import (
 	"fmt"
+	"sync"
 	"time"
 	"regexp"
 )
@@ -32,6 +33,7 @@ type Gwyneth struct {
 	msn *task.Mission
 
 	lm  *slog.LogManager
+	status_mgr *statusManager
 
 	new_src       *noticer
 	update_filter *noticer
@@ -52,6 +54,7 @@ func New(msn *task.Mission, lm *slog.LogManager, cfg *config.Config) (*Gwyneth, 
 		msn: msn,
 
 		lm: lm,
+		status_mgr: newStatusManager(),
 
 		artcl_ch: make(chan *model.Article),
 		do_filter_ch: make(chan *model.Article),
@@ -257,7 +260,7 @@ func (self *Gwyneth) run_rss_collector(msn *task.Mission) error {
 				}
 
 				for _, tgt := range tgts {
-					p.Do(rss_collector, msn.New(), self.lm.GetCollectorsLogger(), tgt, self.artcl_ch)
+					p.Do(rss_collector, msn.New(), self.lm.GetCollectorsLogger(), self.status_mgr, tgt, self.artcl_ch)
 				}
 			}()
 		}
@@ -328,6 +331,10 @@ func (self *Gwyneth) GetSource(id *model.Id) (*model.Source, error) {
 
 func (self *Gwyneth) GetSources() ([]*model.Source, error) {
 	return self.tv.GetSources()
+}
+
+func (self *Gwyneth) GetSourceStatus(id *model.Id) []*model.Status {
+	return self.status_mgr.Get(id)
 }
 
 func (self *Gwyneth) FindSource(kw string) ([]*model.Source, error) {
@@ -613,23 +620,45 @@ func action_filter(msn *task.Mission, args ...any) {
 	}
 }
 
+func makeFailedStatus(s string, msg ...any) *model.Status {
+	return &model.Status{
+		Unixtime: int(time.Now().Unix()),
+		IsSuccess: false,
+		Log: fmt.Sprintf(s, msg...),
+	}
+}
+
+func makeSucceededStatus(s string, msg ...any) *model.Status {
+	return &model.Status{
+		Unixtime: int(time.Now().Unix()),
+		IsSuccess: true,
+		Log: fmt.Sprintf(s, msg...),
+	}
+}
+
 func rss_collector(msn *task.Mission, args ...any) {
 	defer msn.Done()
 
 	logger := args[0].(*slog.Logger)
-	src := args[1].(*model.Source)
-	artcl_ch := args[2].(chan *model.Article)
+	status_mgr := args[1].(*statusManager)
+	src := args[2].(*model.Source)
+	artcl_ch := args[3].(chan *model.Article)
 
 	if task.IsCanceled(msn) {
-		logger.Info("the collector of '%s' is canceld", src.Title())
+		msg := fmt.Sprintf("the collector of '%s' is canceld", src.Title())
+		status_mgr.Update(src.Id(), makeFailedStatus(msg))
+		logger.Info(msg)
 		return
 	}
 
 	logger.Debug("the collector of '%s' is running... :'%s'", src.Title(), src.Value())
 	if err := rss.GetFeed(msn.New(), logger, src, artcl_ch); err != nil {
 		logger.Warn("cannot collect '%s/%s': %s", src.Title(), src.Value(), err)
+		status_mgr.Update(src.Id(), makeFailedStatus("%s", err))
+		return
 	}
 	logger.Debug("the collector of '%s' done!!!", src.Title())
+	status_mgr.Update(src.Id(), makeSucceededStatus("Succeeded"))
 }
 
 func split_src(size int, src_s []*model.Source) [][]*model.Source {
@@ -676,4 +705,49 @@ func (self *noticer) Notice() {
 		case self.msg_ch <- struct{}{}:
 		}
 	}()
+}
+
+type statusManager struct {
+	sts_idx map[string][]*model.Status
+
+	mtx *sync.RWMutex
+}
+
+func newStatusManager() *statusManager {
+	return &statusManager{
+		sts_idx: make(map[string][]*model.Status),
+		mtx: new(sync.RWMutex),
+	}
+}
+
+func (sm *statusManager) Update(id *model.Id, status *model.Status) {
+	sm.mtx.Lock()
+	defer sm.mtx.Unlock()
+
+	sts, ok := sm.sts_idx[id.String()]
+	if !ok {
+		sts = make([]*model.Status, 0, 5)
+	}
+	if len(sts) >= 5 {
+		new_sts := make([]*model.Status, 0, 5)
+		new_sts = append(new_sts, sts[1:]...)
+		sts = new_sts
+	}
+	sts = append(sts, status)
+
+	sm.sts_idx[id.String()] = sts
+}
+
+func (sm *statusManager) Get(id *model.Id) []*model.Status {
+	sm.mtx.RLock()
+	defer sm.mtx.RUnlock()
+
+	sts, ok := sm.sts_idx[id.String()]
+	if !ok {
+		return make([]*model.Status, 0, 0)
+	}
+
+	ret_sts := make([]*model.Status, len(sts))
+	copy(ret_sts, sts)
+	return ret_sts
 }

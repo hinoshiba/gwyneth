@@ -364,7 +364,13 @@ func getHandlerGetSources(g *gwyneth.Gwyneth) func(*gin.Context) {
 
 		ret_src := []*external.Source{}
 		for _, src := range srcs {
-			ret_src = append(ret_src, src.ConvertExternal())
+			ext_src := src.ConvertExternal()
+
+			sts := g.GetSourceStatus(src.Id())
+			for _, st := range sts {
+				ext_src.Status = append(ext_src.Status, st.ConvertExternal())
+			}
+			ret_src = append(ret_src, ext_src)
 		}
 		c.IndentedJSON(http.StatusOK, ret_src)
 	}
@@ -873,7 +879,13 @@ func getHandlerGetSource(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		c.IndentedJSON(http.StatusOK, src.ConvertExternal())
+		ext_src := src.ConvertExternal()
+		sts := g.GetSourceStatus(id)
+		for _, st := range sts {
+			ext_src.Status = append(ext_src.Status, st.ConvertExternal())
+		}
+
+		c.IndentedJSON(http.StatusOK, ext_src)
 	}
 }
 

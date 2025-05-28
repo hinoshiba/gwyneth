@@ -111,6 +111,17 @@ paths:
                         user_create:
                           type: boolean
                           example: false
+                    status:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          timestamp:
+                            type: integer
+                          success:
+                            type: boolean
+                          log:
+                            type: string
     post:
       tags:
         - source
@@ -522,6 +533,17 @@ paths:
                       user_create:
                         type: boolean
                         example: false
+                  status:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        timestamp:
+                          type: integer
+                        success:
+                          type: boolean
+                        log:
+                          type: string
   /source/{sourceId}/pause:
     post:
       tags:
