@@ -6,12 +6,12 @@ import (
 )
 
 import (
-	"github.com/hinoshiba/gwyneth/structs"
-	"github.com/hinoshiba/gwyneth/structs/external"
+	"github.com/hinoshiba/gwyneth/model"
+	"github.com/hinoshiba/gwyneth/model/external"
 )
 
 type Filter struct {
-	id           *structs.Id
+	id           *model.Id
 
 	val_title      string
 	is_regex_title bool
@@ -22,7 +22,7 @@ type Filter struct {
 	action       *Action
 }
 
-func NewFilter(id *structs.Id, val_title string, is_regex_title bool, val_body string, is_regex_body bool, action *Action) *Filter {
+func NewFilter(id *model.Id, val_title string, is_regex_title bool, val_body string, is_regex_body bool, action *Action) *Filter {
 	return &Filter{
 		id: id,
 
@@ -36,7 +36,7 @@ func NewFilter(id *structs.Id, val_title string, is_regex_title bool, val_body s
 	}
 }
 
-func (self *Filter) Id() *structs.Id {
+func (self *Filter) Id() *model.Id {
 	return self.id
 }
 
@@ -60,7 +60,7 @@ func (self *Filter) Action() *Action {
 	return self.action
 }
 
-func (self *Filter) IsMatch(artlc *structs.Article) bool {
+func (self *Filter) IsMatch(artlc *model.Article) bool {
 	if self.is_regex_title {
 		match, _ := regexp.MatchString(self.val_title, artlc.Title())
 		if match {

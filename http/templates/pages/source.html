@@ -14,6 +14,7 @@
 		<button class="btn btn-sm btn-primary w-100" onclick="addSource()">Add Source</button>
 	</div>
 </div>
+
 <h2 class="mb-3">Sources</h2>
 <div class="d-flex justify-content-between align-items-center mb-3">
 	<div>
@@ -28,20 +29,26 @@
 	</div>
 	<div id="paginationControls" class="btn-group"></div>
 </div>
+
 <table class="table table-bordered table-sm">
 	<thead class="table-dark">
 		<tr>
-			<th>ID</th>
-			<th>FeedUrl</th>
-			<th>Name</th>
-			<th>Value</th>
-			<th>Type</th>
-			<th>Pause</th>
+			<th>Feed</th>
+			<th onclick="sortTableBy('title')" style="cursor:pointer">Name <span id="sortIcon-title"></span></th>
+			<th onclick="sortTableBy('value')" style="cursor:pointer">Value <span id="sortIcon-value"></span></th>
+			<th onclick="sortTableBy('type')" style="cursor:pointer">Type <span id="sortIcon-type"></span></th>
+			<th>Collection</th>
+			<th>Latest Result</th>
 			<th>Action</th>
 		</tr>
 	</thead>
 	<tbody id="sourcesTableBody"></tbody>
 </table>
+<style>
+#sourcesTableBody tr:hover {
+	background-color: #f1f1f1;
+}
+</style>
 {{ end }}
 
 {{ define "scripts" }}
@@ -49,6 +56,28 @@
 	let allSources = [];
 	let currentPage = 1;
 	let itemsPerPage = 25;
+	let sortKey = null;
+	let sortAsc = true;
+
+	function sortTableBy(key) {
+		if (sortKey === key) {
+			sortAsc = !sortAsc;
+		} else {
+			sortKey = key;
+			sortAsc = true;
+		}
+
+		allSources.sort((a, b) => {
+			const valA = a[key]?.toLowerCase?.() || a[key]?.name?.toLowerCase?.() || '';
+			const valB = b[key]?.toLowerCase?.() || b[key]?.name?.toLowerCase?.() || '';
+			return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+		});
+
+		document.querySelectorAll("span[id^='sortIcon-']").forEach(e => e.innerHTML = '');
+		document.getElementById(`sortIcon-${key}`).innerHTML = sortAsc ? '▲' : '▼';
+
+		paginateSources();
+	}
 
 	function paginateSources() {
 		const start = (currentPage - 1) * itemsPerPage;
@@ -60,15 +89,32 @@
 
 		visibleSources.forEach(source => {
 			const row = document.createElement('tr');
+			row.style.cursor = 'pointer';
+			row.onclick = (e) => {
+				if (e.target.closest('button') || e.target.tagName.toLowerCase() === 'a') return;
+				window.location.href = `./source/${source.id}`;
+			};
+
+			const statusColor = source.pause ? 'danger' : 'success';
+			const statusLabel = source.pause ? 'Paused' : 'Running';
+			const latestResult = source.status && source.status.length > 0
+				? `<span class="badge bg-${source.status[0].success ? 'primary' : 'danger'}">${source.status[0].success ? 'Success' : 'Failed'}</span>`
+				: '-';
+
+			const feedButton = `<a href="./api/feed/${source.id}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-warning"><i class="bi bi-rss"></i> RSS</a>`;
+			const typeLabel = source.type.name === 'rss'
+				? '<span class="badge bg-info text-dark">rss</span>'
+				: '<span class="badge bg-secondary">noop</span>';
+
 			row.innerHTML = `
-		<td><a href="./source/${source.id}">${source.id}</a></td>
-		<td><a href="./api/feed/${source.id}" target="_blank" rel="noopener noreferrer">feed</a></td>
-		<td>${source.title}</td>
-		<td>${source.value}</td>
-		<td>${source.type.name}</td>
-		<td><span class="badge bg-${source.pause ? 'danger' : 'success'}">${source.pause ? 'Paused' : 'Active'}</span></td>
-		<td><button class="btn btn-sm btn-outline-secondary" onclick="deleteSource('${source.id}')">Delete</button></td>
-	  `;
+	  <td>${feedButton}</td>
+	  <td>${source.title}</td>
+	  <td>${source.value}</td>
+	  <td>${typeLabel}</td>
+	  <td><span class="badge bg-${statusColor}">${statusLabel}</span></td>
+	  <td>${latestResult}</td>
+	  <td><button class="btn btn-sm btn-outline-secondary" onclick="deleteSource('${source.id}')">Delete</button></td>
+	`;
 			tbody.appendChild(row);
 		});
 
@@ -135,7 +181,8 @@
 			.then(res => res.json())
 			.then(data => {
 				allSources = data;
-				paginateSources();
+				if (sortKey) sortTableBy(sortKey);
+				else paginateSources();
 			})
 			.catch(err => console.error('Error fetching sources:', err));
 	}

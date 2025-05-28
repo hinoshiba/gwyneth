@@ -1,8 +1,6 @@
 package rss
 
 import (
-	"fmt"
-	"log/slog"
 	"time"
 	"encoding/json"
 )
@@ -13,10 +11,11 @@ import (
 )
 
 import (
-	"github.com/hinoshiba/gwyneth/structs"
+	"github.com/hinoshiba/gwyneth/slog"
+	"github.com/hinoshiba/gwyneth/model"
 )
 
-func GetFeed(msn *task.Mission, src *structs.Source, artcl_ch chan <- *structs.Article) error {
+func GetFeed(msn *task.Mission, logger *slog.Logger, src *model.Source, artcl_ch chan <- *model.Article) error {
 	defer msn.Done()
 
 	fp := gofeed.NewParser()
@@ -39,13 +38,13 @@ func GetFeed(msn *task.Mission, src *structs.Source, artcl_ch chan <- *structs.A
 
 		raw_j, err := json.Marshal(item)
 		if err != nil {
-			slog.Warn(fmt.Sprintf("convert errror: cannot convert to json str from item struct. : '%s', '%s'", item.Title, url))
+			logger.Warn("convert errror: cannot convert to json str from item struct. : '%s', '%s'", item.Title, url)
 			continue
 		}
 
-		artcl := structs.NewArticle(nil, src, item.Title, item.Description, item.Link, pubdate.Unix(), string(raw_j))
+		artcl := model.NewArticle(nil, src, item.Title, item.Description, item.Link, pubdate.Unix(), string(raw_j))
 
-		go func(msn *task.Mission, artcl *structs.Article) {
+		go func(msn *task.Mission, artcl *model.Article) {
 			defer msn.Done()
 
 			select {

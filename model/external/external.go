@@ -13,6 +13,8 @@ type Source struct {
 	Type  *SourceType `json:"type"`
 	Value string      `json:"value"`
 	Pause bool        `json:"pause"`
+
+	Status []*Status  `json:"status"`
 }
 
 type Article struct {
@@ -43,4 +45,10 @@ type Filter struct {
 type FilterValue struct {
 	Value   string `json:"value"`
 	IsRegex bool   `json:"regex"`
+}
+
+type Status struct {
+	Unixtime  int    `json:"timestamp"`
+	IsSuccess bool   `json:"success"`
+	Log       string `json:"log"`
 }

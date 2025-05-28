@@ -1,4 +1,4 @@
-package structs
+package model
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 )
 
 import (
-	"github.com/hinoshiba/gwyneth/structs/external"
+	"github.com/hinoshiba/gwyneth/model/external"
 )
 
 type Id struct {
@@ -148,6 +148,8 @@ func (self *Source) ConvertExternal() *external.Source {
 		Type: self.src_type.ConvertExternal(),
 		Value: self.val,
 		Pause: self.pause,
+
+		Status: []*external.Status{},
 	}
 }
 
@@ -210,5 +212,19 @@ func (self *Article) ConvertExternal() *external.Article {
 		Link: self.link,
 		Timestamp: int(self.utime),
 		Raw: self.raw,
+	}
+}
+
+type Status struct {
+	Unixtime  int
+	IsSuccess bool
+	Log       string
+}
+
+func (self *Status) ConvertExternal() *external.Status {
+	return &external.Status{
+		Unixtime: self.Unixtime,
+		IsSuccess: self.IsSuccess,
+		Log: self.Log,
 	}
 }

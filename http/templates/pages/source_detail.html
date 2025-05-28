@@ -1,211 +1,168 @@
 {{ define "content" }}
-<h2>Source Detail</h2>
-<div class="d-flex justify-content-between align-items-center">
+<h3 class="mb-3">Source Detail</h3>
+<div class="mb-3 d-flex justify-content-between align-items-center">
 	<div>
-		<a href="{{.AppRoot}}source" class="btn btn-outline-secondary me-2">Back</a>
+		<a href="{{.AppRoot}}/source" class="btn btn-sm btn-outline-secondary">&larr; Back to Sources</a>
+		<a href="{{.AppRoot}}/api/feed/{{.src_id}}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-warning ms-2">
+			<i class="bi bi-rss"></i> Subscribe the Feed
+		</a>
+		<button id="togglePause" class="btn btn-sm btn-outline-danger ms-2">Toggle Pause</button>
+	</div>
+	<div>
+		<button id="editFilters" class="btn btn-sm btn-outline-primary">Edit Filters</button>
+		<button id="saveFilters" class="btn btn-sm btn-success d-none">Save Filters</button>
+		<button id="selectAll" class="btn btn-sm btn-secondary d-none">Select All</button>
+		<button id="deselectAll" class="btn btn-sm btn-secondary d-none">Deselect All</button>
 	</div>
 </div>
-<hr>
+<div id="sourceDetail"></div>
 
-<div class="card mb-4">
-	<div class="card-body">
-		<p><a href="../api/feed/{{.src_id}}" target="_blank" rel="noopener noreferrer">Subscribe the feed</a></p>
-		<div id="data-container">Loading...</div>
-	</div>
-</div>
+<h4 class="mt-4">Status History</h4>
+<table class="table table-bordered table-sm">
+	<thead class="table-light">
+		<tr>
+			<th>Timestamp</th>
+			<th>Status</th>
+			<th>Log</th>
+		</tr>
+	</thead>
+	<tbody id="statusTableBody"></tbody>
+</table>
 
-<div class="card mb-4">
-	<div class="card-body">
-		<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
-			<h5 class="card-title mb-2 mb-md-0">Filters</h5>
-			<div class="d-flex flex-wrap gap-2 align-items-center">
-				<button id="edit-btn" class="btn btn-outline-secondary btn-sm me-1">Edit</button>
-				<button id="save-btn" class="btn btn-success btn-sm me-1" style="display:none">Save</button>
-				<button id="select-all-btn" class="btn btn-outline-primary btn-sm" style="display:none">Select All</button>
-				<button id="deselect-all-btn" class="btn btn-outline-secondary btn-sm" style="display:none">Deselect All</button>
-				<div class="input-group input-group-sm align-items-center" style="width: 200px; display: inline-flex;">
-					<label class="input-group-text" for="refilter-limit">Limit</label>
-					<input type="number" id="refilter-limit" class="form-control" value="50" min="1" max="1000" title="Limit">
-				</div>
-				<button type="button" id="refilter-btn" class="btn btn-outline-primary btn-sm ms-2">Re-filter</button>
-			</div>
-		</div>
-		<table class="table table-bordered mt-3">
-			<thead class="table-dark">
-				<tr>
-					<th>Enable</th>
-					<th>Title</th>
-					<th>TitleRegex</th>
-					<th>Body</th>
-					<th>BodyRegex</th>
-					<th>Action</th>
-				</tr>
-			</thead>
-			<tbody id="filtersTableBody"></tbody>
-		</table>
-	</div>
-</div>
+<h4 class="mt-4">Filters</h4>
+<table class="table table-sm table-bordered">
+	<thead class="table-light">
+		<tr>
+			<th>Enable</th>
+			<th>Title</th>
+			<th>TitleRegex</th>
+			<th>Body</th>
+			<th>BodyRegex</th>
+			<th>Action</th>
+		</tr>
+	</thead>
+	<tbody id="filtersTableBody"></tbody>
+</table>
 {{ end }}
 
 {{ define "scripts" }}
 <script>
-	let editing = false;
-	let originalFilterState = {};
+	document.addEventListener('DOMContentLoaded', function () {
+		const srcId = "{{.src_id}}";
+		const sourceDetail = document.getElementById('sourceDetail');
+		const statusBody = document.getElementById('statusTableBody');
+		const filtersBody = document.getElementById('filtersTableBody');
 
-	document.addEventListener("DOMContentLoaded", function() {
-		const apiUrl = "../api/source/{{.src_id}}";
-		const pauseUrl = apiUrl + "/pause";
-		const resumeUrl = apiUrl + "/resume";
-		const container = document.getElementById("data-container");
-
-		function fetchData() {
-			fetch(apiUrl)
-				.then(response => response.json())
+		function fetchSourceDetail() {
+			fetch(`../api/source/${srcId}`)
+				.then(res => res.json())
 				.then(data => {
-					container.innerHTML = `
-			<table class="table table-sm table-striped">
-			  <tr><th>Title</th><td>${data.title}</td></tr>
-			  <tr><th>Value (Original)</th><td><a href="${data.value}" target="_blank">${data.value}</a></td></tr>
-			  <tr><th>Status</th><td>${data.pause ? "Paused" : "Running"}</td></tr>
-			</table>
-			<button class="btn btn-${data.pause ? 'success' : 'danger'}" id="toggle-btn">
-			  ${data.pause ? "Resume" : "Pause"}
-			</button>
-		  `;
+					const pauseColor = data.pause ? 'danger' : 'success';
+					const pauseLabel = data.pause ? 'Paused' : 'Running';
+					const latestStatus = data.status?.[0];
+					const collectionStatus = latestStatus ? `<span class="badge bg-${latestStatus.success ? 'primary' : 'danger'}">${latestStatus.success ? 'Success' : 'Failed'}</span>` : '-';
 
-					document.getElementById("toggle-btn").addEventListener("click", function() {
-						togglePause(data.pause);
-					});
-				})
-				.catch(error => console.error("Error fetching data:", error));
-		}
+					sourceDetail.innerHTML = `
+		  <table class="table table-sm">
+			<tr><th>Title</th><td>${data.title}</td></tr>
+			<tr><th>Value</th><td><a href="${data.value}" target="_blank">${data.value}</a></td></tr>
+			<tr><th>Type</th><td><span class="badge bg-secondary">${data.type.name}</span></td></tr>
+			<tr><th>Collection</th><td>${collectionStatus}</td></tr>
+			<tr><th>Status</th><td><span class="badge bg-${pauseColor}">${pauseLabel}</span></td></tr>
+		  </table>
+		`;
 
-		function togglePause(isPaused) {
-			const url = isPaused ? resumeUrl : pauseUrl;
-			fetch(url, { method: "POST" })
-				.then(response => response.json())
-				.then(() => fetchData())
-				.catch(error => console.error("Error toggling pause state:", error));
-		}
-
-		fetchData();
-		fetchFilters();
-
-		document.getElementById("edit-btn").onclick = () => {
-			editing = true;
-			document.getElementById("edit-btn").style.display = 'none';
-			document.getElementById("save-btn").style.display = 'inline-block';
-			document.getElementById("select-all-btn").style.display = 'inline-block';
-			document.getElementById("deselect-all-btn").style.display = 'inline-block';
-			document.getElementById("refilter-btn").style.display = 'none';
-			document.querySelectorAll('#filtersTableBody input[type=checkbox]').forEach(cb => cb.disabled = false);
-		};
-
-		document.getElementById("save-btn").onclick = () => {
-			if (!confirm("変更を保存してもよろしいですか？")) return;
-			document.querySelectorAll('#filtersTableBody input[type=checkbox]').forEach(cb => {
-				const id = cb.getAttribute('data-id');
-				const original = originalFilterState[id];
-				const now = cb.checked;
-				if (original !== now) {
-					Check(cb, id);
-				}
-			});
-			editing = false;
-			document.getElementById("edit-btn").style.display = 'inline-block';
-			document.getElementById("save-btn").style.display = 'none';
-			document.getElementById("select-all-btn").style.display = 'none';
-			document.getElementById("deselect-all-btn").style.display = 'none';
-			document.getElementById("refilter-btn").style.display = 'inline-block';
-			document.querySelectorAll('#filtersTableBody input[type=checkbox]').forEach(cb => cb.disabled = true);
-		};
-
-		document.getElementById("select-all-btn").onclick = () => {
-			document.querySelectorAll('#filtersTableBody input[type=checkbox]').forEach(cb => cb.checked = true);
-		};
-
-		document.getElementById("deselect-all-btn").onclick = () => {
-			document.querySelectorAll('#filtersTableBody input[type=checkbox]').forEach(cb => cb.checked = false);
-		};
-
-		document.getElementById("refilter-btn").onclick = refilter;
-	});
-
-	function refilter() {
-		if (!confirm("フィードの再フィルタリングを実行してもよろしいですか？")) return;
-		const limit = parseInt(document.getElementById('refilter-limit').value || '50');
-		const options = {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ limit })
-		};
-
-		fetch("../api/feed/{{.src_id}}/refilter", options)
-			.then(response => {
-				if (!response.ok) throw new Error("Network response was not ok");
-				return response.json();
-			})
-			.then(data => console.log(data))
-			.catch(error => console.error("Refilter failed:", error));
-	}
-
-	function fetchFilters() {
-		fetch('../api/source/{{.src_id}}/filter')
-			.then(response => response.json())
-			.then(sourceFilters => {
-				const filterMap = {};
-				sourceFilters.forEach(f => filterMap[f.id] = true);
-				return filterMap;
-			})
-			.then(filterMap => {
-				return fetch('../api/filter')
-					.then(response => response.json())
-					.then(allFilters => ({ filterMap, allFilters }));
-			})
-			.then(({ filterMap, allFilters }) => {
-				const tableBody = document.getElementById('filtersTableBody');
-				tableBody.innerHTML = '';
-				originalFilterState = {};
-				allFilters.forEach(filter => {
-					const isChecked = filterMap.hasOwnProperty(filter.id);
-					originalFilterState[filter.id] = isChecked;
-					const row = document.createElement('tr');
-					row.innerHTML = `
-			<td><input type="checkbox" data-id="${filter.id}" ${isChecked ? 'checked' : ''} disabled></td>
-						<td>${filter.title.value}</td>
-			<td>${filter.title.regex}</td>
-						<td>${filter.body.value}</td>
-			<td>${filter.body.regex}</td>
-						<td>${filter.action.name}</td>
-		  `;
-					tableBody.appendChild(row);
+					statusBody.innerHTML = '';
+					(data.status || []).forEach(stat => {
+						const date = new Date(stat.timestamp * 1000).toLocaleString();
+						const status = stat.success ? 'Success' : 'Failed';
+						const color = stat.success ? 'primary' : 'danger';
+						const row = document.createElement('tr');
+						row.innerHTML = `
+			<td>${date}</td>
+			<td><span class="badge bg-${color}">${status}</span></td>
+			<td><pre style="margin:0;white-space:pre-wrap;">${stat.log}</pre></td>
+				`;
+				statusBody.appendChild(row);
 				});
-			})
-			.catch(error => console.error('Error fetching filters:', error));
-	}
-
-	function Check(checkbox, id) {
-		const method = checkbox.checked ? 'POST' : 'DELETE';
-		fetch('../api/source/{{.src_id}}/filter', {
-			method,
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ id })
-		})
-			.then(response => {
-				if (!response.ok) {
-					alert('操作に失敗しました');
-					checkbox.checked = !checkbox.checked;
+				});
 				}
-			})
-			.catch(error => {
-				console.error('Error updating filter:', error);
-				checkbox.checked = !checkbox.checked;
-			});
-	}
+
+				document.getElementById('togglePause').addEventListener('click', () => {
+				fetch(`../api/source/${srcId}`)
+				.then(res => res.json())
+				.then(data => {
+				const url = data.pause ? `../api/source/${srcId}/resume` : `../api/source/${srcId}/pause`;
+				fetch(url, { method: 'POST' }).then(() => fetchSourceDetail());
+				});
+				});
+
+				function fetchFilters() {
+				fetch(`../api/filter`)
+				.then(res => res.json())
+				.then(allFilters => {
+				fetch(`../api/source/${srcId}/filter`)
+				.then(res => res.json())
+				.then(enabledFilters => {
+				const enabledIds = new Set(enabledFilters.map(f => f.id));
+				filtersBody.innerHTML = '';
+				allFilters.forEach(filter => {
+				const isChecked = enabledIds.has(filter.id);
+				const row = document.createElement('tr');
+				row.innerHTML = `
+				<td><input type="checkbox" data-id="${filter.id}" ${isChecked ? 'checked' : ''} disabled></td>
+				<td>${filter.title.value}</td>
+				<td>${filter.title.regex}</td>
+				<td>${filter.body.value}</td>
+				<td>${filter.body.regex}</td>
+				<td>${filter.action.name}</td>
+				`;
+				filtersBody.appendChild(row);
+				});
+				});
+				});
+				}
+
+				document.getElementById('editFilters').addEventListener('click', () => {
+				document.querySelectorAll('#filtersTableBody input[type="checkbox"]').forEach(cb => cb.disabled = false);
+				document.getElementById('saveFilters').classList.remove('d-none');
+				document.getElementById('selectAll').classList.remove('d-none');
+				document.getElementById('deselectAll').classList.remove('d-none');
+				document.getElementById('editFilters').classList.add('d-none');
+				});
+
+				document.getElementById('saveFilters').addEventListener('click', () => {
+				if (!confirm('よろしいですか？')) return;
+				const checkboxes = document.querySelectorAll('#filtersTableBody input[type="checkbox"]');
+				checkboxes.forEach(cb => {
+				const id = cb.dataset.id;
+				fetch(`../api/source/${srcId}/filter`, {
+				method: cb.checked ? 'POST' : 'DELETE',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ id })
+				});
+				});
+				checkboxes.forEach(cb => cb.disabled = true);
+				document.getElementById('saveFilters').classList.add('d-none');
+				document.getElementById('selectAll').classList.add('d-none');
+				document.getElementById('deselectAll').classList.add('d-none');
+				document.getElementById('editFilters').classList.remove('d-none');
+				});
+
+				document.getElementById('selectAll').addEventListener('click', () => {
+				document.querySelectorAll('#filtersTableBody input[type="checkbox"]').forEach(cb => cb.checked = true);
+				});
+
+				document.getElementById('deselectAll').addEventListener('click', () => {
+				document.querySelectorAll('#filtersTableBody input[type="checkbox"]').forEach(cb => cb.checked = false);
+				});
+
+				fetchSourceDetail();
+				fetchFilters();
+				});
 </script>
 {{ end }}
 
-
 {{define "contents"}}
-  {{ template "layout" . }}
+	{{ template "layout" . }}
 {{ end }}
