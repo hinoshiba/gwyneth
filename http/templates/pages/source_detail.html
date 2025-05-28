@@ -1,36 +1,27 @@
 {{ define "content" }}
 <h3 class="mb-3">Source Detail</h3>
-<div class="mb-3 d-flex justify-content-between align-items-center">
-	<div>
-		<a href="{{.AppRoot}}/source" class="btn btn-sm btn-outline-secondary">&larr; Back to Sources</a>
-		<a href="{{.AppRoot}}/api/feed/{{.src_id}}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-warning ms-2">
-			<i class="bi bi-rss"></i> Subscribe the Feed
-		</a>
-		<button id="togglePause" class="btn btn-sm btn-outline-danger ms-2">Toggle Pause</button>
-	</div>
-	<div>
-		<button id="editFilters" class="btn btn-sm btn-outline-primary">Edit Filters</button>
-		<button id="saveFilters" class="btn btn-sm btn-success d-none">Save Filters</button>
-		<button id="selectAll" class="btn btn-sm btn-secondary d-none">Select All</button>
-		<button id="deselectAll" class="btn btn-sm btn-secondary d-none">Deselect All</button>
-	</div>
+<div class="mb-3">
+	<a href="{{.AppRoot}}source" class="btn btn-sm btn-outline-secondary">&larr; Back to Sources</a>
+	<a href="{{.AppRoot}}api/feed/{{.src_id}}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-warning ms-2">
+		<i class="bi bi-rss"></i> Subscribe the Feed
+	</a>
+	<button id="refilterBtn" class="btn btn-sm btn-outline-primary ms-2">Re-Filter</button>
+	<select id="refilterLimit" class="form-select form-select-sm d-inline-block w-auto ms-2">
+		<option value="10">10</option>
+		<option value="25">25</option>
+		<option value="50" selected>50</option>
+		<option value="100">100</option>
+		<option value="200">200</option>
+	</select>
 </div>
 <div id="sourceDetail"></div>
-
-<h4 class="mt-4">Status History</h4>
+<div id="filterControls" class="my-3">
+	<button id="editFiltersBtn" class="btn btn-sm btn-outline-secondary">Edit Filters</button>
+	<button id="saveFiltersBtn" class="btn btn-sm btn-success d-none">Save</button>
+	<button id="selectAllFiltersBtn" class="btn btn-sm btn-outline-info d-none">Select All</button>
+	<button id="deselectAllFiltersBtn" class="btn btn-sm btn-outline-info d-none">Deselect All</button>
+</div>
 <table class="table table-bordered table-sm">
-	<thead class="table-light">
-		<tr>
-			<th>Timestamp</th>
-			<th>Status</th>
-			<th>Log</th>
-		</tr>
-	</thead>
-	<tbody id="statusTableBody"></tbody>
-</table>
-
-<h4 class="mt-4">Filters</h4>
-<table class="table table-sm table-bordered">
 	<thead class="table-light">
 		<tr>
 			<th>Enable</th>
@@ -43,123 +34,169 @@
 	</thead>
 	<tbody id="filtersTableBody"></tbody>
 </table>
+<h4 class="mt-4">Status History</h4>
+<table class="table table-bordered table-sm">
+	<thead class="table-light">
+		<tr>
+			<th>Timestamp</th>
+			<th>Status</th>
+			<th>Log</th>
+		</tr>
+	</thead>
+	<tbody id="statusTableBody"></tbody>
+</table>
 {{ end }}
 
 {{ define "scripts" }}
 <script>
 	document.addEventListener('DOMContentLoaded', function () {
 		const srcId = "{{.src_id}}";
-		const sourceDetail = document.getElementById('sourceDetail');
-		const statusBody = document.getElementById('statusTableBody');
-		const filtersBody = document.getElementById('filtersTableBody');
+		let isEditing = false;
+		let originalFilterState = {};
 
 		function fetchSourceDetail() {
 			fetch(`../api/source/${srcId}`)
 				.then(res => res.json())
 				.then(data => {
+					const container = document.getElementById('sourceDetail');
 					const pauseColor = data.pause ? 'danger' : 'success';
 					const pauseLabel = data.pause ? 'Paused' : 'Running';
-					const latestStatus = data.status?.[0];
+					const latestStatus = data.status && data.status.length > 0 ? data.status[0] : null;
 					const collectionStatus = latestStatus ? `<span class="badge bg-${latestStatus.success ? 'primary' : 'danger'}">${latestStatus.success ? 'Success' : 'Failed'}</span>` : '-';
 
-					sourceDetail.innerHTML = `
+					container.innerHTML = `
 		  <table class="table table-sm">
 			<tr><th>Title</th><td>${data.title}</td></tr>
 			<tr><th>Value</th><td><a href="${data.value}" target="_blank">${data.value}</a></td></tr>
 			<tr><th>Type</th><td><span class="badge bg-secondary">${data.type.name}</span></td></tr>
 			<tr><th>Collection</th><td>${collectionStatus}</td></tr>
-			<tr><th>Status</th><td><span class="badge bg-${pauseColor}">${pauseLabel}</span></td></tr>
+			<tr><th>Status</th><td><span class="badge bg-${pauseColor}" id="pauseStatus">${pauseLabel}</span></td></tr>
 		  </table>
+		  <button class="btn btn-sm btn-outline-warning" id="pauseToggleBtn">${data.pause ? 'Resume' : 'Pause'}</button>
 		`;
 
-					statusBody.innerHTML = '';
-					(data.status || []).forEach(stat => {
-						const date = new Date(stat.timestamp * 1000).toLocaleString();
-						const status = stat.success ? 'Success' : 'Failed';
-						const color = stat.success ? 'primary' : 'danger';
-						const row = document.createElement('tr');
-						row.innerHTML = `
-			<td>${date}</td>
-			<td><span class="badge bg-${color}">${status}</span></td>
-			<td><pre style="margin:0;white-space:pre-wrap;">${stat.log}</pre></td>
-				`;
-				statusBody.appendChild(row);
+					document.getElementById('pauseToggleBtn').onclick = () => {
+						const url = data.pause ? `../api/source/${srcId}/resume` : `../api/source/${srcId}/pause`;
+						fetch(url, { method: 'POST' }).then(() => fetchSourceDetail());
+					};
 				});
-				});
-				}
+		}
 
-				document.getElementById('togglePause').addEventListener('click', () => {
-				fetch(`../api/source/${srcId}`)
+		function fetchFilters() {
+			Promise.all([
+				fetch(`../api/source/${srcId}/filter`).then(res => res.json()),
+				fetch(`../api/filter`).then(res => res.json())
+			]).then(([enabledFilters, allFilters]) => {
+				const enabledMap = {};
+				enabledFilters.forEach(f => enabledMap[f.id] = true);
+				const tbody = document.getElementById('filtersTableBody');
+				tbody.innerHTML = '';
+				originalFilterState = {};
+
+				allFilters.forEach(filter => {
+					const enabled = enabledMap[filter.id] || false;
+					originalFilterState[filter.id] = enabled;
+
+					const row = document.createElement('tr');
+					row.innerHTML = `
+		  <td><input type="checkbox" data-id="${filter.id}" class="filter-checkbox" ${enabled ? 'checked' : ''} disabled></td>
+		  <td>${filter.title.value}</td>
+		  <td>${filter.title.regex}</td>
+		  <td>${filter.body.value}</td>
+		  <td>${filter.body.regex}</td>
+		  <td>${filter.action.name}</td>
+		`;
+					tbody.appendChild(row);
+				});
+			});
+		}
+
+		function toggleEditFilters() {
+			isEditing = !isEditing;
+			document.querySelectorAll('.filter-checkbox').forEach(cb => cb.disabled = !isEditing);
+			document.getElementById('saveFiltersBtn').classList.toggle('d-none', !isEditing);
+			document.getElementById('selectAllFiltersBtn').classList.toggle('d-none', !isEditing);
+			document.getElementById('deselectAllFiltersBtn').classList.toggle('d-none', !isEditing);
+			document.getElementById('editFiltersBtn').classList.toggle('d-none', isEditing);
+			document.getElementById('refilterBtn').classList.toggle('d-none', isEditing);
+			document.getElementById('refilterLimit').classList.toggle('d-none', isEditing);
+		}
+
+		function saveFilters() {
+			if (!confirm('よろしいですか？')) return;
+			const changes = [];
+			document.querySelectorAll('.filter-checkbox').forEach(cb => {
+				const id = cb.getAttribute('data-id');
+				const enabled = cb.checked;
+				if (enabled !== originalFilterState[id]) {
+					changes.push({ id, enabled });
+				}
+			});
+			Promise.all(changes.map(change => {
+				return fetch(`../api/source/${srcId}/filter`, {
+					method: change.enabled ? 'POST' : 'DELETE',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ id: change.id })
+				});
+			})).then(() => {
+				toggleEditFilters();
+				fetchFilters();
+			});
+		}
+
+		function selectAllFilters() {
+			document.querySelectorAll('.filter-checkbox').forEach(cb => cb.checked = true);
+		}
+
+		function deselectAllFilters() {
+			document.querySelectorAll('.filter-checkbox').forEach(cb => cb.checked = false);
+		}
+
+		function refilter() {
+			if (!confirm('よろしいですか？')) return;
+			const limit = document.getElementById('refilterLimit').value;
+			fetch(`../api/feed/${srcId}/refilter`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ limit: parseInt(limit) })
+			});
+		}
+
+		function fetchStatusHistory() {
+			fetch(`../api/source/${srcId}`)
 				.then(res => res.json())
 				.then(data => {
-				const url = data.pause ? `../api/source/${srcId}/resume` : `../api/source/${srcId}/pause`;
-				fetch(url, { method: 'POST' }).then(() => fetchSourceDetail());
-				});
-				});
+					const statusBody = document.getElementById('statusTableBody');
+					statusBody.innerHTML = '';
+					if (data.status && data.status.length > 0) {
+						data.status.forEach(stat => {
+							const date = new Date(stat.timestamp * 1000).toLocaleString();
+							const status = stat.success ? 'Success' : 'Failed';
+							const color = stat.success ? 'primary' : 'danger';
+							const row = document.createElement('tr');
+							row.innerHTML = `
+								<td>${date}</td>
+								<td><span class="badge bg-${color}">${status}</span></td>
+								<td><pre style="margin:0;white-space:pre-wrap;">${stat.log}</pre></td>
+									`;
+									statusBody.appendChild(row);
+									});
+									} else {
+									statusBody.innerHTML = `<tr><td colspan="3" class="text-muted">No status data available.</td></tr>`;
+									}
+									});
+									}
 
-				function fetchFilters() {
-				fetch(`../api/filter`)
-				.then(res => res.json())
-				.then(allFilters => {
-				fetch(`../api/source/${srcId}/filter`)
-				.then(res => res.json())
-				.then(enabledFilters => {
-				const enabledIds = new Set(enabledFilters.map(f => f.id));
-				filtersBody.innerHTML = '';
-				allFilters.forEach(filter => {
-				const isChecked = enabledIds.has(filter.id);
-				const row = document.createElement('tr');
-				row.innerHTML = `
-				<td><input type="checkbox" data-id="${filter.id}" ${isChecked ? 'checked' : ''} disabled></td>
-				<td>${filter.title.value}</td>
-				<td>${filter.title.regex}</td>
-				<td>${filter.body.value}</td>
-				<td>${filter.body.regex}</td>
-				<td>${filter.action.name}</td>
-				`;
-				filtersBody.appendChild(row);
-				});
-				});
-				});
-				}
+									document.getElementById('editFiltersBtn').onclick = toggleEditFilters;
+									document.getElementById('saveFiltersBtn').onclick = saveFilters;
+									document.getElementById('selectAllFiltersBtn').onclick = selectAllFilters;
+									document.getElementById('deselectAllFiltersBtn').onclick = deselectAllFilters;
+									document.getElementById('refilterBtn').onclick = refilter;
 
-				document.getElementById('editFilters').addEventListener('click', () => {
-				document.querySelectorAll('#filtersTableBody input[type="checkbox"]').forEach(cb => cb.disabled = false);
-				document.getElementById('saveFilters').classList.remove('d-none');
-				document.getElementById('selectAll').classList.remove('d-none');
-				document.getElementById('deselectAll').classList.remove('d-none');
-				document.getElementById('editFilters').classList.add('d-none');
-				});
-
-				document.getElementById('saveFilters').addEventListener('click', () => {
-				if (!confirm('よろしいですか？')) return;
-				const checkboxes = document.querySelectorAll('#filtersTableBody input[type="checkbox"]');
-				checkboxes.forEach(cb => {
-				const id = cb.dataset.id;
-				fetch(`../api/source/${srcId}/filter`, {
-				method: cb.checked ? 'POST' : 'DELETE',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ id })
-				});
-				});
-				checkboxes.forEach(cb => cb.disabled = true);
-				document.getElementById('saveFilters').classList.add('d-none');
-				document.getElementById('selectAll').classList.add('d-none');
-				document.getElementById('deselectAll').classList.add('d-none');
-				document.getElementById('editFilters').classList.remove('d-none');
-				});
-
-				document.getElementById('selectAll').addEventListener('click', () => {
-				document.querySelectorAll('#filtersTableBody input[type="checkbox"]').forEach(cb => cb.checked = true);
-				});
-
-				document.getElementById('deselectAll').addEventListener('click', () => {
-				document.querySelectorAll('#filtersTableBody input[type="checkbox"]').forEach(cb => cb.checked = false);
-				});
-
-				fetchSourceDetail();
-				fetchFilters();
-				});
+									fetchSourceDetail();
+									fetchFilters();
+									fetchStatusHistory();
+									});
 </script>
 {{ end }}
 
