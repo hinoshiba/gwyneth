@@ -1,12 +1,13 @@
 package filter
 
 import (
+	"os"
 	"os/exec"
+	"io"
 	"fmt"
 	"bufio"
 	"strings"
 	"syscall"
-	"encoding/json"
 )
 
 import (
@@ -53,7 +54,7 @@ func (self *Action) ConvertExternal() *external.Action {
 	}
 }
 
-func (self *Action) Do(msn *task.Mission, logger *slog.Logger, artcl *model.Article) error {
+func (self *Action) Do(msn *task.Mission, logger *slog.Logger, path string) error {
 	defer msn.Done()
 	logger.Debug("call '%s' '%s'", self.name, self.cmd)
 
@@ -109,14 +110,15 @@ func (self *Action) Do(msn *task.Mission, logger *slog.Logger, artcl *model.Arti
 		return err
 	}
 
-	ext_artcle := artcl.ConvertExternal()
-	stdin_val, err := json.Marshal(ext_artcle)
+	writer := bufio.NewWriter(stdin)
+	file, err := os.Open(path)
 	if err != nil {
+		msn.Cancel()
 		return err
 	}
-
-	_, err = fmt.Fprintln(stdin, string(stdin_val))
-	if err != nil {
+	defer file.Close()
+	if _, err = io.Copy(writer, file); err != nil {
+		msn.Cancel()
 		return err
 	}
 	stdin.Close()

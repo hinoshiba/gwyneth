@@ -13,6 +13,7 @@ import (
 
 import (
 	"github.com/l4go/task"
+	"github.com/fsnotify/fsnotify"
 )
 
 import (
@@ -29,7 +30,6 @@ import (
 
 const (
 	COLLECTOR_RSS_POOL_SIZE = 10
-	FILTER_ACTION_POOL_SIZE = 10
 )
 
 type Gwyneth struct {
@@ -240,27 +240,72 @@ func (self *Gwyneth) run_action_manager(msn *task.Mission) error {
 
 	slog.Debug("start action manager")
 
-	p := task.NewPool(msn.New(), FILTER_ACTION_POOL_SIZE)
-	defer p.Close()
-
 	actions, err := self.getActions()
 	if err != nil {
 		return err
 	}
 
 	for _, action := range actions {
-		q, dlq := self.makeActionQueuePath(action)
+		q_path, dlq_path := self.makeActionQueuePath(action)
 
-		if err := os.MkdirAll(q, 0755); err != nil {
+		if err := os.MkdirAll(q_path, 0755); err != nil {
 			return err
 		}
-		if err := os.MkdirAll(dlq, 0755); err != nil {
+		if err := os.MkdirAll(dlq_path, 0755); err != nil {
 			return err
 		}
+
+		go func(msn *task.Mission, action *filter.Action, q_path string, dlq_path string) { //TODO: WIP make named func
+			defer msn.Done()
+
+			watcher, err := fsnotify.NewWatcher()
+			if err != nil {
+				slog.Error("cannot make wathcer a dir %s: %s", q_path, err)
+				return
+			}
+			defer watcher.Close()
+			if err := watcher.Add(q_path); err != nil {
+				slog.Error("cannot make wathcer a dir %s: %s", q_path, err)
+				return
+			}
+
+			//TODO:WIP ls for 1st
+
+			for {
+				select {
+				case <- msn.RecvCancel():
+					return
+				case err, ok := <-watcher.Errors:
+					if !ok {
+						return
+					}
+					slog.Error("cannot make wathcer a dir %s: %s", q_path, err)
+				case event, ok := <-watcher.Events:
+					if !ok {
+						return
+					}
+
+					if event.Op&(fsnotify.Create|fsnotify.Write) == 0 {
+						continue
+					}
+
+					tgt_path := filepath.Clean(event.Name)
+					if err := action.Do(msn.New(), self.lm.GetActionsLogger(), tgt_path); err != nil {
+						self.lm.GetActionsLogger().Error("%s Action Failed: %s", action.Name(), err)
+
+						fname := filepath.Base(tgt_path)
+						dlq_f_path := filepath.Join(dlq_path, fname)
+						self.lm.GetActionsLogger().Debug("mv %s %s", tgt_path, dlq_f_path)
+						if err := os.Rename(tgt_path, dlq_f_path); err != nil {
+							slog.Error("cannot move to dlq: src: %s, dst: %s, err: %s", tgt_path, dlq_f_path, err)
+						}
+					}
+				}
+			}
+
+		}(msn.New(), action, q_path, dlq_path)
 	}
 	return nil
-
-	//p.Do(action_filter, msn.New(), self.lm.GetActionsLogger(), f.Action(), artcl) // TODO: WIP
 }
 
 func (self *Gwyneth) run_rss_collector(msn *task.Mission) error {
@@ -675,22 +720,6 @@ func (self *Gwyneth) ReFilter(src_id *model.Id, limit int64) error {
 		}
 	}(self.msn.New())
 	return nil
-}
-
-func action_filter(msn *task.Mission, args ...any) {
-	defer msn.Done()
-
-	logger := args[0].(*slog.Logger)
-	action := args[1].(*filter.Action)
-	artcl := args[2].(*model.Article)
-
-	if task.IsCanceled(msn) {
-		logger.Info("the filter's action is canceld")
-		return
-	}
-	if err := action.Do(msn.New(), logger, artcl); err != nil {
-		logger.Error("failed: execute filter: %s", err)
-	}
 }
 
 func makeFailedStatus(s string, msg ...any) *model.Status {
