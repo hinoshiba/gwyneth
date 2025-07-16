@@ -10,7 +10,7 @@ http:
 feed:
   title: gwyneth feed
   description:
-  link: http://localhost:8000/
+  link: http://localhost:8000/gwyneth
   author_name: hinoshiba
   author_email: hinoshiba@example.com
   default_type: rss
