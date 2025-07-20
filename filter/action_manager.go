@@ -86,6 +86,7 @@ func (self *ActionManager) AddQueueItem(id *model.Id, body []byte) error {
 	if _, err := os.Stat(path); os.IsExist(err) {
 		return fmt.Errorf("%s is already exist.", path)
 	}
+	slog.Debug("ActionManager.Write item %s", path)
 	return ioutil.WriteFile(path, body, 0644)
 }
 
