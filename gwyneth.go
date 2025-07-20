@@ -196,7 +196,7 @@ func (self *Gwyneth) run_filter_engine(msn *task.Mission) error {
 				f_buf[artcl.Src().Id().String()] = new_fs
 			}
 
-			go func (msn *task.Mission, artcl *model.Article) {
+			go func (msn *task.Mission, artcl *model.Article, fs []*filter.Filter) { //TODO: WIP: duplicate bug
 				defer msn.Done()
 
 				ext_artcle := artcl.ConvertExternal()
@@ -215,7 +215,7 @@ func (self *Gwyneth) run_filter_engine(msn *task.Mission) error {
 						slog.Warn("failed: cannot put %s queue: '%s'", artcl.Id(), err)
 					}
 				}
-			}(msn.New(), artcl)
+			}(msn.New(), artcl, fs)
 		}
 	}
 }

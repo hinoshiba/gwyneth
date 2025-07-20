@@ -171,6 +171,7 @@ func (self *ActionManager) run_f_watcher() {
 				if event.Op&(fsnotify.Create|fsnotify.Write) == 0 {
 					continue
 				}
+				slog.Debug("recv target: %s, %s", event.Name, event.Op)
 
 				select {
 				case <- msn.RecvCancel():
@@ -226,10 +227,11 @@ func (self *ActionManager) task_handler(msn *task.Mission) {
 
 					fname := filepath.Base(q_fpath)
 					dlq_f_path := filepath.Join(self.path_dlq, fname)
-					self.logger.Debug("mv %s %s", q_fpath, dlq_f_path)
+					slog.Debug("mv %s %s", q_fpath, dlq_f_path)
 					if err := os.Rename(q_fpath, dlq_f_path); err != nil {
 						slog.Error("cannot move to dlq: src: %s, dst: %s, err: %s", q_fpath, dlq_f_path, err)
 					}
+					return
 				}
 				if err := os.Remove(q_fpath); err != nil {
 					slog.Error("cannot rm q file: %s, err: %s", q_fpath, err)
