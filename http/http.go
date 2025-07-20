@@ -148,6 +148,18 @@ func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
 		))
 	})
 
+	self.engine.GET("/action/:id", func(c *gin.Context) {
+		action_id := c.Param("id")
+
+		c.Render(http.StatusOK, self.makeRenderHtml(
+			"action_detail.html",
+			&gin.H{
+				"Page": "action_detail",
+				"action_id": fmt.Sprintf("%s", action_id),
+			},
+		))
+	})
+
 	self.engine.GET("/filter", func(c *gin.Context) {
 		c.Render(http.StatusOK, self.makeRenderHtml(
 			"filter.html",
@@ -201,6 +213,14 @@ func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
 	api.GET("/action", getHandlerGetActions(g))
 	api.POST("/action", getHandlerAddAction(g))
 	api.DELETE("/action", getHandlerDeleteAction(g))
+
+	api.POST("/action/:id/restart", getHandlerRestartAction(g))
+	api.POST("/action/:id/cancel", getHandlerCancelAction(g))
+	api.GET("/action/:id/queue/", getHandlerGetQeueMessages(g))
+	api.GET("/action/:id/dlqueue/", getHandlerGetDlqMessages(g))
+	api.DELETE("/action/:id/queue/:msg_id", getHandlerDeleteActionQueueMessage(g))
+	api.DELETE("/action/:id/dlqueue/:msg_id", getHandlerDeleteActionDlqMessage(g))
+	api.POST("/action/:id/dlqueue/:msg_id/redrive", getHandlerRedriveActionMessage(g))
 
 	api.GET("/filter", getHandlerGetFilters(g))
 	api.POST("/filter", getHandlerAddFilter(g))
@@ -747,6 +767,208 @@ func getHandlerDeleteAction(g *gwyneth.Gwyneth) func(*gin.Context) {
 
 		c.JSON(http.StatusOK, gin.H{
 			"id": action.Id,
+		})
+	}
+}
+
+func getHandlerRestartAction(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		id_base := c.Query("id")
+		if id_base == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "id is empty"})
+			return
+		}
+		id, err := model.ParseStringId(id_base)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		if err := g.RestartAction(id); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message": "success",
+		})
+	}
+}
+
+func getHandlerCancelAction(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		id_base := c.Query("id")
+		if id_base == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "id is empty"})
+			return
+		}
+		id, err := model.ParseStringId(id_base)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		if err := g.CancelAction(id); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message": "success",
+		})
+	}
+}
+
+func getHandlerGetQeueMessages(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		id_base := c.Query("id")
+		if id_base == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "id is empty"})
+			return
+		}
+		id, err := model.ParseStringId(id_base)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		articles, err := g.GetActionQueueItems(id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		ext_artcles := make([]*external.Article, len(articles), len(articles))
+		for i, article := range articles {
+			ext_artcles[i] = article.ConvertExternal()
+		}
+		c.IndentedJSON(http.StatusOK, ext_artcles)
+	}
+}
+
+func getHandlerGetDlqMessages(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		id_base := c.Query("id")
+		if id_base == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "id is empty"})
+			return
+		}
+		id, err := model.ParseStringId(id_base)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		articles, err := g.GetActionDlqItems(id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		ext_artcles := make([]*external.Article, len(articles), len(articles))
+		for i, article := range articles {
+			ext_artcles[i] = article.ConvertExternal()
+		}
+		c.IndentedJSON(http.StatusOK, ext_artcles)
+	}
+}
+
+func getHandlerDeleteActionQueueMessage(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		action_id_base := c.Query("id")
+		if action_id_base == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "id is empty"})
+			return
+		}
+		action_id, err := model.ParseStringId(action_id_base)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		msg_id_base := c.Query("msg_id")
+		if msg_id_base == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "id is empty"})
+			return
+		}
+		msg_id, err := model.ParseStringId(msg_id_base)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		if err := g.DeleteActionQueueItem(action_id, msg_id); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message": "success",
+		})
+	}
+}
+
+func getHandlerDeleteActionDlqMessage(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		action_id_base := c.Query("id")
+		if action_id_base == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "id is empty"})
+			return
+		}
+		action_id, err := model.ParseStringId(action_id_base)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		msg_id_base := c.Query("msg_id")
+		if msg_id_base == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "id is empty"})
+			return
+		}
+		msg_id, err := model.ParseStringId(msg_id_base)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		if err := g.DeleteActionDlqItem(action_id, msg_id); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message": "success",
+		})
+	}
+}
+
+func getHandlerRedriveActionMessage(g *gwyneth.Gwyneth) func(*gin.Context) {
+	return func(c *gin.Context) {
+		action_id_base := c.Query("id")
+		if action_id_base == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "id is empty"})
+			return
+		}
+		action_id, err := model.ParseStringId(action_id_base)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		msg_id_base := c.Query("msg_id")
+		if msg_id_base == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "id is empty"})
+			return
+		}
+		msg_id, err := model.ParseStringId(msg_id_base)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		if err := g.RedriveActionDlqItem(action_id, msg_id); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message": "success",
 		})
 	}
 }

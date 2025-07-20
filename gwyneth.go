@@ -2,7 +2,6 @@ package gwyneth
 
 import (
 	"os"
-	"io/ioutil"
 	"fmt"
 	"sync"
 	"time"
@@ -13,14 +12,12 @@ import (
 
 import (
 	"github.com/l4go/task"
-	"github.com/fsnotify/fsnotify"
 )
 
 import (
 	"github.com/hinoshiba/gwyneth/slog"
 	"github.com/hinoshiba/gwyneth/config"
 	"github.com/hinoshiba/gwyneth/tv"
-	"github.com/hinoshiba/gwyneth/model/external"
 	"github.com/hinoshiba/gwyneth/model"
 	"github.com/hinoshiba/gwyneth/filter"
 
@@ -44,14 +41,13 @@ type Gwyneth struct {
 
 	new_src       *noticer
 	filter_cond   *noticer
-	action_cond   *noticer
-
-	action_gmtx   *groupMutex
 
 	artcl_ch     chan *model.Article
 	do_filter_ch chan *model.Article
 
 	default_source_type map[string]struct{}
+
+	action_mgr_idx *actionManagerIndex
 }
 
 func New(msn *task.Mission, lm *slog.LogManager, cfg *config.Config) (*Gwyneth, error) {
@@ -71,11 +67,10 @@ func New(msn *task.Mission, lm *slog.LogManager, cfg *config.Config) (*Gwyneth, 
 		artcl_ch: make(chan *model.Article),
 		do_filter_ch: make(chan *model.Article),
 
-		action_gmtx: NewGroupMutex(),
-
 		new_src:       newNoticer(msn.NewCancel()),
 		filter_cond: newNoticer(msn.NewCancel()),
-		action_cond: newNoticer(msn.NewCancel()),
+
+		action_mgr_idx: newActionManagerIndex(),
 	}
 
 	if err := self.init(); err != nil {
@@ -104,9 +99,9 @@ func (self *Gwyneth) init() error {
 
 	go self.run_core(self.msn.New())
 	go self.run_article_recoder(self.msn.New())
+	self.run_action_managers()
 
 	self.new_src.Notice()
-	self.action_cond.Notice()
 	self.filter_cond.Notice()
 	return nil
 }
@@ -116,7 +111,6 @@ func (self *Gwyneth) run_core(msn *task.Mission) {
 
 	var msn_clctr  *task.Mission
 	var msn_filtr  *task.Mission
-	var msn_action *task.Mission
 	for {
 		select {
 		case <- msn.RecvCancel():
@@ -147,17 +141,6 @@ func (self *Gwyneth) run_core(msn *task.Mission) {
 					slog.Error("failed: wakeup filter engine: %s", err)
 				}
 			}(msn_filtr)
-		case <- self.action_cond.Recv():
-			if msn_action != nil {
-				msn_action.Cancel()
-			}
-
-			msn_action = msn.New()
-			go func(msn_action *task.Mission){
-				if err := self.run_action_manager(msn_action.New()); err != nil {
-					slog.Error("failed: wakeup action manager: %s", err)
-				}
-			}(msn_action)
 		}
 	}
 }
@@ -224,15 +207,12 @@ func (self *Gwyneth) run_filter_engine(msn *task.Mission) error {
 				}
 
 				for _, f := range fs {
-					q, _ := self.makeActionQueuePath(f.Action())
-
-					target_path := filepath.Join(q, artcl.Id().String())
-					if _, err := os.Stat(target_path); os.IsExist(err) {
-						continue
+					mgr, err := self.action_mgr_idx.Get(f.Action().Id())
+					if err != nil {
+						slog.Warn("failed: cannot find action: %s", err)
 					}
-
-					if err := ioutil.WriteFile(target_path, body, 0644); err != nil {
-						slog.Warn("failed: cannot put %s queue: '%s'", target_path, err)
+					if err := mgr.AddQueueItem(artcl.Id(), body); err != nil {
+						slog.Warn("failed: cannot put %s queue: '%s'", artcl.Id(), err)
 					}
 				}
 			}(msn.New(), artcl)
@@ -240,122 +220,20 @@ func (self *Gwyneth) run_filter_engine(msn *task.Mission) error {
 	}
 }
 
-func (self *Gwyneth) run_action_manager(msn *task.Mission) error {
-	defer msn.Done()
-
-	slog.Debug("start action manager")
-
+func (self *Gwyneth) run_action_managers() error {
 	actions, err := self.getActions()
 	if err != nil {
 		return err
 	}
 
 	for _, action := range actions {
-		self.action_gmtx.New(action.Id())
-		q_path, dlq_path := self.makeActionQueuePath(action)
-
-		if err := os.MkdirAll(q_path, 0755); err != nil {
+		mgr, err := filter.NewActionManager(self.msn.New(), action, self.cfg.Action, self.lm.GetActionsLogger())
+		if err != nil {
 			return err
 		}
-		if err := os.MkdirAll(dlq_path, 0755); err != nil {
-			return err
-		}
-
-		go self.action_watcher(msn.New(), action, q_path, dlq_path)
+		self.action_mgr_idx.Add(action.Id(), mgr)
 	}
 	return nil
-}
-
-func (self *Gwyneth) action_watcher(msn *task.Mission, action *filter.Action, q_path string, dlq_path string) {
-	defer msn.Done()
-
-	q_fpath_ch := make(chan string)
-	defer close(q_fpath_ch)
-
-	go func(msn *task.Mission) {
-		defer msn.Done()
-
-		watcher, err := fsnotify.NewWatcher()
-		if err != nil {
-			slog.Error("cannot make wathcer a dir %s: %s", q_path, err)
-			return
-		}
-		defer watcher.Close()
-		if err := watcher.Add(q_path); err != nil {
-			slog.Error("cannot make wathcer a dir %s: %s", q_path, err)
-			return
-		}
-
-		for {
-			select {
-			case <- msn.RecvCancel():
-				return
-			case err, ok := <-watcher.Errors:
-				if !ok {
-					return
-				}
-				slog.Error("cannot make wathcer a dir %s: %s", q_path, err)
-			case event, ok := <-watcher.Events:
-				if !ok {
-					return
-				}
-
-				if event.Op&(fsnotify.Create|fsnotify.Write) == 0 {
-					continue
-				}
-
-				select {
-				case <- msn.RecvCancel():
-					return
-				case q_fpath_ch <- filepath.Clean(event.Name):
-				}
-			}
-		}
-	}(msn.New())
-
-	go func (msn *task.Mission) {
-		fs, err := os.ReadDir(q_path)
-		if err != nil {
-			slog.Error("cannot read %s queue: %s", q_path, err)
-			return
-		}
-
-		for _, f := range fs {
-			if f.IsDir() {
-				continue
-			}
-			select {
-			case <- msn.RecvCancel():
-				return
-			case q_fpath_ch <- filepath.Join(q_path, f.Name()):
-			}
-		}
-	}(msn.New())
-
-	for {
-		select {
-		case <- msn.RecvCancel():
-		case q_fpath := <- q_fpath_ch:
-			func() {
-				self.action_gmtx.Lock(action.Id())
-				defer self.action_gmtx.Unlock(action.Id())
-
-				if err := action.Do(msn.New(), self.lm.GetActionsLogger(), q_fpath); err != nil {
-					self.lm.GetActionsLogger().Error("%s Action Failed: %s", action.Name(), err)
-
-					fname := filepath.Base(q_fpath)
-					dlq_f_path := filepath.Join(dlq_path, fname)
-					self.lm.GetActionsLogger().Debug("mv %s %s", q_fpath, dlq_f_path)
-					if err := os.Rename(q_fpath, dlq_f_path); err != nil {
-						slog.Error("cannot move to dlq: src: %s, dst: %s, err: %s", q_fpath, dlq_f_path, err)
-					}
-				}
-				if err := os.Remove(q_fpath); err != nil {
-					slog.Error("cannot rm q file: %s, err: %s", q_fpath, err)
-				}
-			}()
-		}
-	}
 }
 
 func (self *Gwyneth) run_rss_collector(msn *task.Mission) error {
@@ -453,15 +331,6 @@ func (self *Gwyneth) checkAndInitSourceTypes() error {
 		self.default_source_type[st.Id().String()] = struct{}{}
 	}
 	return nil
-}
-
-func (self *Gwyneth) makeActionQueuePath(a *filter.Action) (string, string) {
-	base := filepath.Join(self.cfg.Action.QueueDir, a.Id().String())
-
-	new_q := filepath.Join(base, "new")
-	dl_q := filepath.Join(base, "deadletter")
-
-	return new_q, dl_q
 }
 
 func (self *Gwyneth) AddSourceType(name string, cmd string, is_user_creation bool) (*model.SourceType, error) {
@@ -603,9 +472,12 @@ func (self *Gwyneth) addAction(name string, cmd string) (*filter.Action, error) 
 	if err != nil {
 		return nil, err
 	}
+	mgr, err := filter.NewActionManager(self.msn.New(), action, self.cfg.Action, self.lm.GetActionsLogger())
+	if err != nil {
+		return nil, err
+	}
+	self.action_mgr_idx.Add(action.Id(), mgr)
 
-	self.filter_cond.Notice()
-	self.action_cond.Notice()
 	return action, nil
 }
 
@@ -630,18 +502,48 @@ func (self *Gwyneth) DeleteAction(id *model.Id) error {
 }
 
 func (self *Gwyneth) deleteAction(id *model.Id) error {
+	mgr, err := self.action_mgr_idx.Get(id)
+	if err != nil {
+		return err
+	}
+	q_items, err := mgr.GetQueueItems()
+	if err != nil {
+		return err
+	}
+	if len(q_items) > 0 {
+		return fmt.Errorf("Queue item size is not zero.")
+	}
+	dlq_items, err := mgr.GetDeadletterQueueItems()
+	if err != nil {
+		return err
+	}
+	if len(dlq_items) > 0 {
+		return fmt.Errorf("Deadletter Queue item size is not zero.")
+	}
+
 	if err := self.tv.DeleteAction(id); err != nil {
 		return err
 	}
 
-	self.filter_cond.Notice()
-	self.action_cond.Notice()
-	self.action_gmtx.Release(id)
 	return nil
 }
 
-func (self *Gwyneth) RestartAllActions() { //TODO: Add HTTP Interface
-	self.action_cond.Notice()
+func (self *Gwyneth) CancelAction(id *model.Id) error {
+	mgr, err := self.action_mgr_idx.Get(id)
+	if err != nil {
+		return err
+	}
+	mgr.CancelAction()
+	return nil
+}
+
+func (self *Gwyneth) RestartAction(id *model.Id) error {
+	mgr, err := self.action_mgr_idx.Get(id)
+	if err != nil {
+		return err
+	}
+	mgr.Restart()
+	return nil
 }
 
 func (self *Gwyneth) GetActionQueueItems(id *model.Id) ([]*model.Article, error) {
@@ -649,16 +551,11 @@ func (self *Gwyneth) GetActionQueueItems(id *model.Id) ([]*model.Article, error)
 }
 
 func (self *Gwyneth) getActionQueueItems(id *model.Id) ([]*model.Article, error) {
-	action, err := self.getAction(id)
+	mgr, err := self.action_mgr_idx.Get(id)
 	if err != nil {
 		return nil, err
 	}
-
-	self.action_gmtx.RLock(action.Id())
-	defer self.action_gmtx.RUnlock(action.Id())
-
-	q_path, _ := self.makeActionQueuePath(action)
-	return getQueueItems(q_path)
+	return mgr.GetQueueItems()
 }
 
 func (self *Gwyneth) GetActionDlqItems(id *model.Id) ([]*model.Article, error) {
@@ -666,47 +563,11 @@ func (self *Gwyneth) GetActionDlqItems(id *model.Id) ([]*model.Article, error) {
 }
 
 func (self *Gwyneth) getActionDlqItems(id *model.Id) ([]*model.Article, error) {
-	action, err := self.getAction(id)
+	mgr, err := self.action_mgr_idx.Get(id)
 	if err != nil {
 		return nil, err
 	}
-
-	self.action_gmtx.RLock(action.Id())
-	defer self.action_gmtx.RUnlock(action.Id())
-
-	_, dlq_path := self.makeActionQueuePath(action)
-	return getQueueItems(dlq_path)
-}
-
-func getQueueItems(path string) ([]*model.Article, error) {
-	fs, err := os.ReadDir(path)
-	if err != nil {
-		return nil, err
-	}
-
-	articles := []*model.Article{}
-	for _, f := range fs {
-		if f.IsDir() {
-			continue
-		}
-
-		f_path := filepath.Join(path, f.Name())
-		content, err := os.ReadFile(f_path)
-		if err != nil {
-			return nil, fmt.Errorf("failed: cannot read q file: %s, %s", f_path, err)
-		}
-		var ex_artcle external.Article
-		if err := json.Unmarshal(content, &ex_artcle); err != nil {
-			return nil, fmt.Errorf("failed: cannot convert q file: %s, %s", f_path, err)
-		}
-		article, err := model.ImportExternalArticle(&ex_artcle)
-		if err != nil {
-			return nil, fmt.Errorf("failed: cannot convert q file: %s, %s", f_path, err)
-		}
-
-		articles = append(articles, article)
-	}
-	return articles, nil
+	return mgr.GetDeadletterQueueItems()
 }
 
 func (self *Gwyneth) DeleteActionQueueItem(action_id *model.Id, q_item_id *model.Id) error {
@@ -714,17 +575,11 @@ func (self *Gwyneth) DeleteActionQueueItem(action_id *model.Id, q_item_id *model
 }
 
 func (self *Gwyneth) deleteActionQueueItem(action_id *model.Id, q_item_id *model.Id) error {
-	action, err := self.getAction(action_id)
+	mgr, err := self.action_mgr_idx.Get(action_id)
 	if err != nil {
 		return err
 	}
-
-	self.action_gmtx.Lock(action.Id())
-	defer self.action_gmtx.Unlock(action.Id())
-
-	q_path, _ := self.makeActionQueuePath(action)
-	f_path := filepath.Join(q_path, q_item_id.String())
-	return os.Remove(f_path)
+	return mgr.DeleteQueueItem(q_item_id)
 }
 
 func (self *Gwyneth) DeleteActionDlqItem(action_id *model.Id, q_item_id *model.Id) error {
@@ -732,17 +587,11 @@ func (self *Gwyneth) DeleteActionDlqItem(action_id *model.Id, q_item_id *model.I
 }
 
 func (self *Gwyneth) deleteActionDlqItem(action_id *model.Id, q_item_id *model.Id) error {
-	action, err := self.getAction(action_id)
+	mgr, err := self.action_mgr_idx.Get(action_id)
 	if err != nil {
 		return err
 	}
-
-	self.action_gmtx.Lock(action.Id())
-	defer self.action_gmtx.Unlock(action.Id())
-
-	_, dlq_path := self.makeActionQueuePath(action)
-	f_path := filepath.Join(dlq_path, q_item_id.String())
-	return os.Remove(f_path)
+	return mgr.DeleteDeadletterQueueItem(q_item_id)
 }
 
 func (self *Gwyneth) RedriveActionDlqItem(action_id *model.Id, q_item_id *model.Id) error {
@@ -750,18 +599,11 @@ func (self *Gwyneth) RedriveActionDlqItem(action_id *model.Id, q_item_id *model.
 }
 
 func (self *Gwyneth) redriveActionDlqItem(action_id *model.Id, q_item_id *model.Id) error {
-	action, err := self.getAction(action_id)
+	mgr, err := self.action_mgr_idx.Get(action_id)
 	if err != nil {
 		return err
 	}
-
-	self.action_gmtx.Lock(action.Id())
-	defer self.action_gmtx.Unlock(action.Id())
-
-	q_path, dlq_path := self.makeActionQueuePath(action)
-	q_fpath := filepath.Join(q_path, q_item_id.String())
-	dlq_fpath := filepath.Join(dlq_path, q_item_id.String())
-	return os.Rename(q_fpath, dlq_fpath)
+	return mgr.Redrive(q_item_id)
 }
 
 func (self *Gwyneth) AddFilter(title string, regex_title bool, body string, regex_body bool, action_id *model.Id) (*filter.Filter, error) {
@@ -1031,91 +873,43 @@ func (sm *statusManager) Get(id *model.Id) []*model.Status {
 	return ret_sts
 }
 
-type groupMutex struct {
-	idx_mtx *sync.RWMutex
-	idx     map[string]*sync.RWMutex
+type actionManagerIndex struct {
+	idx map[string]*filter.ActionManager
+	mtx *sync.RWMutex
 }
 
-func NewGroupMutex() *groupMutex {
-	return &groupMutex{
-		idx_mtx: new(sync.RWMutex),
-		idx: map[string]*sync.RWMutex{},
+func newActionManagerIndex() *actionManagerIndex {
+	return &actionManagerIndex{
+		idx: map[string]*filter.ActionManager{},
+		mtx: new(sync.RWMutex),
 	}
 }
 
-func (gm *groupMutex) New(id *model.Id) {
-	gm.idx_mtx.Lock()
-	defer gm.idx_mtx.Unlock()
+func (self *actionManagerIndex) Get(id *model.Id) (*filter.ActionManager, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
 
-	_, ok := gm.idx[id.String()]
-	if ok {
-		return
+	mgr, ok := self.idx[id.String()]
+	if !ok {
+		return nil, fmt.Errorf("an ActionManager is not loaded")
 	}
-	gm.idx[id.String()] = new(sync.RWMutex)
+	return mgr, nil
 }
 
-func (gm *groupMutex) Release(id *model.Id) {
-	gm.idx_mtx.Lock()
-	defer gm.idx_mtx.Unlock()
+func (self *actionManagerIndex) Add(id *model.Id, mgr *filter.ActionManager) {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
 
-	mtx, ok := gm.idx[id.String()]
+	self.idx[id.String()] = mgr
+}
+
+func (self *actionManagerIndex) Delete(id *model.Id) {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	_, ok := self.idx[id.String()]
 	if !ok {
 		return
 	}
-	mtx.Lock()
-	defer mtx.Unlock()
-
-	delete(gm.idx, id.String())
-}
-
-func (gm *groupMutex) Lock(id *model.Id) error {
-	gm.idx_mtx.RLock()
-	defer gm.idx_mtx.RUnlock()
-
-	mtx, ok := gm.idx[id.String()]
-	if !ok {
-		return fmt.Errorf("groupMutex: %s is not defined", id)
-	}
-
-	mtx.Lock()
-	return nil
-}
-
-func (gm *groupMutex) Unlock(id *model.Id) error {
-	gm.idx_mtx.RLock()
-	defer gm.idx_mtx.RUnlock()
-
-	mtx, ok := gm.idx[id.String()]
-	if !ok {
-		return fmt.Errorf("groupMutex: %s is not defined", id)
-	}
-
-	mtx.Unlock()
-	return nil
-}
-
-func (gm *groupMutex) RLock(id *model.Id) error {
-	gm.idx_mtx.RLock()
-	defer gm.idx_mtx.RUnlock()
-
-	mtx, ok := gm.idx[id.String()]
-	if !ok {
-		return fmt.Errorf("groupMutex: %s is not defined", id)
-	}
-
-	mtx.RLock()
-	return nil
-}
-
-func (gm *groupMutex) RUnlock(id *model.Id) error {
-	gm.idx_mtx.RLock()
-	defer gm.idx_mtx.RUnlock()
-
-	mtx, ok := gm.idx[id.String()]
-	if !ok {
-		return fmt.Errorf("groupMutex: %s is not defined", id)
-	}
-
-	mtx.RUnlock()
-	return nil
+	delete(self.idx, id.String())
 }

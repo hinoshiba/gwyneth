@@ -696,6 +696,159 @@ paths:
                   id:
                     type: string
                     example: 174dc6ff-45f9-4b82-9131-d9617e4d4f5b
+  /action/{action_id}/restart:
+    post:
+      tags:
+        - action
+      summary: restart the action.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: success
+  /action/{action_id}/cancel:
+    post:
+      tags:
+        - action
+      summary: cancel progressed task.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: success
+  /action/{action_id}/queue:
+    get:
+      tags:
+        - action
+      summary: get queue items.
+      responses:
+        '200':
+          description: A Feed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        title:
+                          type: string
+                          example: new news 01
+                        body:
+                          type: string
+                          example: news description
+                        src:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              example: 13b46d3e-1612-4224-8865-a5b449bcbc61
+                        link:
+                          type: string
+                          example: http://example.com/rss
+                        raw:
+                          type: string
+                          example: the raw data of article
+                        timestamp: 
+                          type: integer
+                          example: 1710933677
+  /action/{action_id}/queue/{message_id}:
+    delete:
+      tags:
+        - action
+      summary: delete queued items.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: success
+  /action/{action_id}/dlqueue:
+    get:
+      tags:
+        - action
+      summary: get deadletter queue items.
+      responses:
+        '200':
+          description: A Feed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        title:
+                          type: string
+                          example: new news 01
+                        body:
+                          type: string
+                          example: news description
+                        src:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              example: 13b46d3e-1612-4224-8865-a5b449bcbc61
+                        link:
+                          type: string
+                          example: http://example.com/rss
+                        raw:
+                          type: string
+                          example: the raw data of article
+                        timestamp: 
+                          type: integer
+                          example: 1710933677
+  /action/{action_id}/dlqueue/{message_id}:
+    delete:
+      tags:
+        - action
+      summary: delete deadletter queued items.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: success
+  /action/{action_id}/dlqueue/{message_id}/redrive:
+    delete:
+      tags:
+        - action
+      summary: move queued item to queue from deadletter queue
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: success
   /filter:
     get:
       tags:
