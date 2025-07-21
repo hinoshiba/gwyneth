@@ -216,8 +216,8 @@ func (self *Router) mapRoute(g *gwyneth.Gwyneth) error {
 
 	api.POST("/action/:id/restart", getHandlerRestartAction(g))
 	api.POST("/action/:id/cancel", getHandlerCancelAction(g))
-	api.GET("/action/:id/queue/", getHandlerGetQeueMessages(g))
-	api.GET("/action/:id/dlqueue/", getHandlerGetDlqMessages(g))
+	api.GET("/action/:id/queue", getHandlerGetQeueMessages(g))
+	api.GET("/action/:id/dlqueue", getHandlerGetDlqMessages(g))
 	api.DELETE("/action/:id/queue/:msg_id", getHandlerDeleteActionQueueMessage(g))
 	api.DELETE("/action/:id/dlqueue/:msg_id", getHandlerDeleteActionDlqMessage(g))
 	api.POST("/action/:id/dlqueue/:msg_id/redrive", getHandlerRedriveActionMessage(g))
@@ -773,7 +773,7 @@ func getHandlerDeleteAction(g *gwyneth.Gwyneth) func(*gin.Context) {
 
 func getHandlerRestartAction(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		id_base := c.Query("id")
+		id_base := c.Param("id")
 		if id_base == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "id is empty"})
 			return
@@ -796,7 +796,7 @@ func getHandlerRestartAction(g *gwyneth.Gwyneth) func(*gin.Context) {
 
 func getHandlerCancelAction(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		id_base := c.Query("id")
+		id_base := c.Param("id")
 		if id_base == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "id is empty"})
 			return
@@ -819,7 +819,7 @@ func getHandlerCancelAction(g *gwyneth.Gwyneth) func(*gin.Context) {
 
 func getHandlerGetQeueMessages(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		id_base := c.Query("id")
+		id_base := c.Param("id")
 		if id_base == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "id is empty"})
 			return
@@ -846,7 +846,7 @@ func getHandlerGetQeueMessages(g *gwyneth.Gwyneth) func(*gin.Context) {
 
 func getHandlerGetDlqMessages(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		id_base := c.Query("id")
+		id_base := c.Param("id")
 		if id_base == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "id is empty"})
 			return
@@ -873,7 +873,7 @@ func getHandlerGetDlqMessages(g *gwyneth.Gwyneth) func(*gin.Context) {
 
 func getHandlerDeleteActionQueueMessage(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		action_id_base := c.Query("id")
+		action_id_base := c.Param("id")
 		if action_id_base == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "id is empty"})
 			return
@@ -884,7 +884,7 @@ func getHandlerDeleteActionQueueMessage(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		msg_id_base := c.Query("msg_id")
+		msg_id_base := c.Param("msg_id")
 		if msg_id_base == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "id is empty"})
 			return
@@ -907,7 +907,7 @@ func getHandlerDeleteActionQueueMessage(g *gwyneth.Gwyneth) func(*gin.Context) {
 
 func getHandlerDeleteActionDlqMessage(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		action_id_base := c.Query("id")
+		action_id_base := c.Param("id")
 		if action_id_base == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "id is empty"})
 			return
@@ -918,7 +918,7 @@ func getHandlerDeleteActionDlqMessage(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		msg_id_base := c.Query("msg_id")
+		msg_id_base := c.Param("msg_id")
 		if msg_id_base == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "id is empty"})
 			return
@@ -941,7 +941,7 @@ func getHandlerDeleteActionDlqMessage(g *gwyneth.Gwyneth) func(*gin.Context) {
 
 func getHandlerRedriveActionMessage(g *gwyneth.Gwyneth) func(*gin.Context) {
 	return func(c *gin.Context) {
-		action_id_base := c.Query("id")
+		action_id_base := c.Param("id")
 		if action_id_base == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "id is empty"})
 			return
@@ -952,7 +952,7 @@ func getHandlerRedriveActionMessage(g *gwyneth.Gwyneth) func(*gin.Context) {
 			return
 		}
 
-		msg_id_base := c.Query("msg_id")
+		msg_id_base := c.Param("msg_id")
 		if msg_id_base == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "id is empty"})
 			return

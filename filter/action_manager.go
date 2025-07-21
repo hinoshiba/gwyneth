@@ -2,7 +2,6 @@ package filter
 
 import (
 	"os"
-	"io/ioutil"
 	"fmt"
 	"sync"
 	"path/filepath"
@@ -26,6 +25,7 @@ type ActionManager struct {
 	action    *Action
 
 	path_q    string
+	path_tmp  string
 	path_dlq  string
 
 	logger    *slog.Logger
@@ -44,6 +44,10 @@ func NewActionManager(msn *task.Mission, action *Action, cfg *config.Action, log
 	if err := os.MkdirAll(path_q, 0755); err != nil {
 		return nil, err
 	}
+	path_tmp := filepath.Join(path_qbase, "tmp")
+	if err := os.MkdirAll(path_tmp, 0755); err != nil {
+		return nil, err
+	}
 	path_dlq := filepath.Join(path_qbase, "deadletter")
 	if err := os.MkdirAll(path_dlq, 0755); err != nil {
 		return nil, err
@@ -53,6 +57,7 @@ func NewActionManager(msn *task.Mission, action *Action, cfg *config.Action, log
 		action: action,
 
 		path_q: path_q,
+		path_tmp: path_tmp,
 		path_dlq: path_dlq,
 
 		logger: logger,
@@ -82,12 +87,18 @@ func (self *ActionManager) Close() {
 }
 
 func (self *ActionManager) AddQueueItem(id *model.Id, body []byte) error {
-	path := filepath.Join(self.path_q, id.String())
-	if _, err := os.Stat(path); os.IsExist(err) {
-		return fmt.Errorf("%s is already exist.", path)
+	tmpfile, err := os.CreateTemp(self.path_tmp, "tmp-*")
+	if err != nil {
+		return err
 	}
-	slog.Debug("ActionManager.Write item %s", path)
-	return ioutil.WriteFile(path, body, 0644)
+	if _, err := tmpfile.Write(body); err != nil {
+		return err
+	}
+	tmpfile.Close()
+
+	path := filepath.Join(self.path_q, id.String())
+	slog.Debug("ActionManager.Write item %s -> %s", tmpfile.Name(), path)
+	return os.Rename(tmpfile.Name(), path)
 }
 
 func (self *ActionManager) GetQueueItems() ([]*model.Article, error) {
@@ -111,7 +122,7 @@ func (self *ActionManager) DeleteDeadletterQueueItem(id *model.Id) error {
 func (self *ActionManager) Redrive(id *model.Id) error {
 	q_fpath := filepath.Join(self.path_q, id.String())
 	dlq_fpath := filepath.Join(self.path_dlq, id.String())
-	return os.Rename(q_fpath, dlq_fpath)
+	return os.Rename(dlq_fpath, q_fpath)
 }
 
 func (self *ActionManager) CancelAction() {
@@ -169,16 +180,18 @@ func (self *ActionManager) run_f_watcher() {
 					return
 				}
 
-				if event.Op&(fsnotify.Create|fsnotify.Write) == 0 {
-					continue
-				}
-				slog.Debug("recv target: %s, %s", event.Name, event.Op)
+				go func(event *fsnotify.Event) {
+					if event.Op&(fsnotify.Create) == 0 {
+						return
+					}
+					slog.Debug("%p recv target: %s, %s", self, event.Name, event.Op)
 
-				select {
-				case <- msn.RecvCancel():
-					return
-				case self.fpath_ch <- filepath.Clean(event.Name):
-				}
+					select {
+					case <- msn.RecvCancel():
+						return
+					case self.fpath_ch <- filepath.Clean(event.Name):
+					}
+				}(&event)
 			}
 		}
 	}(self.msn.New())
@@ -212,6 +225,11 @@ func (self *ActionManager) task_handler(msn *task.Mission) {
 		case q_fpath := <- self.fpath_ch:
 			func(msn *task.Mission) {
 				defer msn.Done()
+
+				if _, err := os.Stat(q_fpath); os.IsNotExist(err) {
+					self.logger.Warn("%s is not exist", q_fpath)
+					return
+				}
 
 				cc := self.getSessionCanceller()
 				go func () {

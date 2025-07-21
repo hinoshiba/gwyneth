@@ -196,7 +196,7 @@ func (self *Gwyneth) run_filter_engine(msn *task.Mission) error {
 				f_buf[artcl.Src().Id().String()] = new_fs
 			}
 
-			go func (msn *task.Mission, artcl *model.Article, fs []*filter.Filter) { //TODO: WIP: duplicate bug
+			go func (msn *task.Mission, artcl *model.Article, fs []*filter.Filter) {
 				defer msn.Done()
 
 				ext_artcle := artcl.ConvertExternal()
