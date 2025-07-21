@@ -216,7 +216,7 @@ func (self *ActionManager) run_f_watcher() {
 			select {
 			case <- msn.RecvCancel():
 				return
-			case self.fpath_ch <- filepath.Join(self.path_q, f.Name()):
+			case self.fpath_ch <- filepath.Join(self.path_wip, f.Name()):
 			}
 		}
 	}(self.msn.New())
