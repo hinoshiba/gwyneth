@@ -158,6 +158,27 @@ func (self *ActionManager) getSessionCanceller() task.Canceller {
 }
 
 func (self *ActionManager) run_f_watcher() {
+	func() {
+		fs, err := os.ReadDir(self.path_wip)
+		if err != nil {
+			slog.Error("cannot read %s queue: %s", self.path_wip, err)
+			return
+		}
+
+		for _, f := range fs {
+			if f.IsDir() {
+				continue
+			}
+
+			w_path := filepath.Join(self.path_wip, f.Name())
+			q_path := filepath.Join(self.path_q, f.Name())
+
+			if err := os.Rename(w_path, q_path); err != nil {
+				self.logger.Warn("cant move wip to queue: %s", err)
+			}
+		}
+	}()
+
 	go func(msn *task.Mission) {
 		defer msn.Done()
 
@@ -198,25 +219,6 @@ func (self *ActionManager) run_f_watcher() {
 					case self.fpath_ch <- filepath.Clean(event.Name):
 					}
 				}(&event)
-			}
-		}
-	}(self.msn.New())
-
-	go func (msn *task.Mission) {
-		fs, err := os.ReadDir(self.path_wip)
-		if err != nil {
-			slog.Error("cannot read %s queue: %s", self.path_wip, err)
-			return
-		}
-
-		for _, f := range fs {
-			if f.IsDir() {
-				continue
-			}
-			select {
-			case <- msn.RecvCancel():
-				return
-			case self.fpath_ch <- filepath.Join(self.path_wip, f.Name()):
 			}
 		}
 	}(self.msn.New())
