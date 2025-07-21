@@ -3,6 +3,7 @@ module github.com/hinoshiba/gwyneth
 go 1.23.9
 
 require (
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gin-gonic/gin v1.10.1
 	github.com/go-sql-driver/mysql v1.9.2
 	github.com/google/uuid v1.6.0

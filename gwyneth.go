@@ -1,10 +1,13 @@
 package gwyneth
 
 import (
+	"os"
 	"fmt"
 	"sync"
 	"time"
+	"path/filepath"
 	"regexp"
+	"encoding/json"
 )
 
 import (
@@ -25,23 +28,26 @@ import (
 
 const (
 	COLLECTOR_RSS_POOL_SIZE = 10
-	FILTER_ACTION_POOL_SIZE = 10
 )
 
 type Gwyneth struct {
 	tv  *tv.TimeVortex
 	msn *task.Mission
 
-	lm  *slog.LogManager
+	cfg *config.Config
+
+	lm         *slog.LogManager
 	status_mgr *statusManager
 
 	new_src       *noticer
-	update_filter *noticer
+	filter_cond   *noticer
 
 	artcl_ch     chan *model.Article
 	do_filter_ch chan *model.Article
 
 	default_source_type map[string]struct{}
+
+	action_mgr_idx *actionManagerIndex
 }
 
 func New(msn *task.Mission, lm *slog.LogManager, cfg *config.Config) (*Gwyneth, error) {
@@ -53,6 +59,8 @@ func New(msn *task.Mission, lm *slog.LogManager, cfg *config.Config) (*Gwyneth, 
 		tv: t,
 		msn: msn,
 
+		cfg: cfg,
+
 		lm: lm,
 		status_mgr: newStatusManager(),
 
@@ -60,7 +68,9 @@ func New(msn *task.Mission, lm *slog.LogManager, cfg *config.Config) (*Gwyneth, 
 		do_filter_ch: make(chan *model.Article),
 
 		new_src:       newNoticer(msn.NewCancel()),
-		update_filter: newNoticer(msn.NewCancel()),
+		filter_cond: newNoticer(msn.NewCancel()),
+
+		action_mgr_idx: newActionManagerIndex(),
 	}
 
 	if err := self.init(); err != nil {
@@ -81,19 +91,26 @@ func (self *Gwyneth) init() error {
 	if err := self.checkAndInitSourceTypes(); err != nil {
 		return err
 	}
+
+	q_dir := filepath.Clean(self.cfg.Action.QueueDir)
+	if err := os.MkdirAll(q_dir, 0755); err != nil {
+		return err
+	}
+
 	go self.run_core(self.msn.New())
 	go self.run_article_recoder(self.msn.New())
+	self.run_action_managers()
 
 	self.new_src.Notice()
-	self.update_filter.Notice()
+	self.filter_cond.Notice()
 	return nil
 }
 
 func (self *Gwyneth) run_core(msn *task.Mission) {
 	defer msn.Done()
 
-	var msn_clctr *task.Mission
-	var msn_filtr *task.Mission
+	var msn_clctr  *task.Mission
+	var msn_filtr  *task.Mission
 	for {
 		select {
 		case <- msn.RecvCancel():
@@ -111,7 +128,7 @@ func (self *Gwyneth) run_core(msn *task.Mission) {
 					slog.Error("failed: wakeup rss collector: %s", err)
 				}
 			}(msn_clctr)
-		case <- self.update_filter.Recv():
+		case <- self.filter_cond.Recv():
 			if msn_filtr != nil {
 				msn_filtr.Cancel()
 			}
@@ -121,7 +138,7 @@ func (self *Gwyneth) run_core(msn *task.Mission) {
 				defer msn_filtr.Done()
 
 				if err := self.run_filter_engine(msn_filtr.New()); err !=nil {
-					slog.Error("failed: wakeup article recorder: %s", err)
+					slog.Error("failed: wakeup filter engine: %s", err)
 				}
 			}(msn_filtr)
 		}
@@ -162,10 +179,6 @@ func (self *Gwyneth) run_filter_engine(msn *task.Mission) error {
 	slog.Debug("start filter engine")
 
 	f_buf := make(map[string][]*filter.Filter)
-
-	p := task.NewPool(msn.New(), FILTER_ACTION_POOL_SIZE)
-	defer p.Close()
-
 	for {
 		select {
 		case <- msn.RecvCancel():
@@ -183,20 +196,44 @@ func (self *Gwyneth) run_filter_engine(msn *task.Mission) error {
 				f_buf[artcl.Src().Id().String()] = new_fs
 			}
 
-			go func (msn *task.Mission, artcl *model.Article) {
+			go func (msn *task.Mission, artcl *model.Article, fs []*filter.Filter) {
 				defer msn.Done()
 
-				for _, f := range fs {
-					go func(msn *task.Mission, f filter.Filter) {
-						defer msn.Done()
-						if f.IsMatch(artcl) {
-							p.Do(action_filter, msn.New(), self.lm.GetActionsLogger(), f.Action(), artcl)
-						}
-					}(msn.New(), *f)
+				ext_artcle := artcl.ConvertExternal()
+				body, err := json.Marshal(ext_artcle)
+				if err != nil {
+					slog.Warn("failed: cannot convert string: article_id: '%s'", artcl.Id().String())
+					return
 				}
-			}(msn.New(), artcl)
+
+				for _, f := range fs {
+					mgr, err := self.action_mgr_idx.Get(f.Action().Id())
+					if err != nil {
+						slog.Warn("failed: cannot find action: %s", err)
+					}
+					if err := mgr.AddQueueItem(artcl.Id(), body); err != nil {
+						slog.Warn("failed: cannot put %s queue: '%s'", artcl.Id(), err)
+					}
+				}
+			}(msn.New(), artcl, fs)
 		}
 	}
+}
+
+func (self *Gwyneth) run_action_managers() error {
+	actions, err := self.getActions()
+	if err != nil {
+		return err
+	}
+
+	for _, action := range actions {
+		mgr, err := filter.NewActionManager(self.msn.New(), action, self.cfg.Action, self.lm.GetActionsLogger())
+		if err != nil {
+			return err
+		}
+		self.action_mgr_idx.Add(action.Id(), mgr)
+	}
+	return nil
 }
 
 func (self *Gwyneth) run_rss_collector(msn *task.Mission) error {
@@ -209,7 +246,7 @@ func (self *Gwyneth) run_rss_collector(msn *task.Mission) error {
 
 	src_s, err := self.tv.GetSources()
 	if err != nil {
-		return err
+		return fmt.Errorf("Cannot Get Sources: %s", err)
 	}
 
 	tgts := []*model.Source{}
@@ -435,8 +472,12 @@ func (self *Gwyneth) addAction(name string, cmd string) (*filter.Action, error) 
 	if err != nil {
 		return nil, err
 	}
+	mgr, err := filter.NewActionManager(self.msn.New(), action, self.cfg.Action, self.lm.GetActionsLogger())
+	if err != nil {
+		return nil, err
+	}
+	self.action_mgr_idx.Add(action.Id(), mgr)
 
-	self.update_filter.Notice()
 	return action, nil
 }
 
@@ -461,12 +502,108 @@ func (self *Gwyneth) DeleteAction(id *model.Id) error {
 }
 
 func (self *Gwyneth) deleteAction(id *model.Id) error {
+	mgr, err := self.action_mgr_idx.Get(id)
+	if err != nil {
+		return err
+	}
+	q_items, err := mgr.GetQueueItems()
+	if err != nil {
+		return err
+	}
+	if len(q_items) > 0 {
+		return fmt.Errorf("Queue item size is not zero.")
+	}
+	dlq_items, err := mgr.GetDeadletterQueueItems()
+	if err != nil {
+		return err
+	}
+	if len(dlq_items) > 0 {
+		return fmt.Errorf("Deadletter Queue item size is not zero.")
+	}
+
 	if err := self.tv.DeleteAction(id); err != nil {
 		return err
 	}
 
-	self.update_filter.Notice()
 	return nil
+}
+
+func (self *Gwyneth) CancelAction(id *model.Id) error {
+	mgr, err := self.action_mgr_idx.Get(id)
+	if err != nil {
+		return err
+	}
+	mgr.CancelAction()
+	return nil
+}
+
+func (self *Gwyneth) RestartAction(id *model.Id) error {
+	mgr, err := self.action_mgr_idx.Get(id)
+	if err != nil {
+		return err
+	}
+	mgr.Restart()
+	return nil
+}
+
+func (self *Gwyneth) GetActionQueueItems(id *model.Id) ([]*model.Article, error) {
+	return self.getActionQueueItems(id)
+}
+
+func (self *Gwyneth) getActionQueueItems(id *model.Id) ([]*model.Article, error) {
+	mgr, err := self.action_mgr_idx.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	return mgr.GetQueueItems()
+}
+
+func (self *Gwyneth) GetActionDlqItems(id *model.Id) ([]*model.Article, error) {
+	return self.getActionDlqItems(id)
+}
+
+func (self *Gwyneth) getActionDlqItems(id *model.Id) ([]*model.Article, error) {
+	mgr, err := self.action_mgr_idx.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	return mgr.GetDeadletterQueueItems()
+}
+
+func (self *Gwyneth) DeleteActionQueueItem(action_id *model.Id, q_item_id *model.Id) error {
+	return self.deleteActionQueueItem(action_id, q_item_id)
+}
+
+func (self *Gwyneth) deleteActionQueueItem(action_id *model.Id, q_item_id *model.Id) error {
+	mgr, err := self.action_mgr_idx.Get(action_id)
+	if err != nil {
+		return err
+	}
+	return mgr.DeleteQueueItem(q_item_id)
+}
+
+func (self *Gwyneth) DeleteActionDlqItem(action_id *model.Id, q_item_id *model.Id) error {
+	return self.deleteActionDlqItem(action_id, q_item_id)
+}
+
+func (self *Gwyneth) deleteActionDlqItem(action_id *model.Id, q_item_id *model.Id) error {
+	mgr, err := self.action_mgr_idx.Get(action_id)
+	if err != nil {
+		return err
+	}
+	return mgr.DeleteDeadletterQueueItem(q_item_id)
+}
+
+func (self *Gwyneth) RedriveActionDlqItem(action_id *model.Id, q_item_id *model.Id) error {
+	return self.redriveActionDlqItem(action_id, q_item_id)
+}
+
+func (self *Gwyneth) redriveActionDlqItem(action_id *model.Id, q_item_id *model.Id) error {
+	mgr, err := self.action_mgr_idx.Get(action_id)
+	if err != nil {
+		return err
+	}
+	return mgr.Redrive(q_item_id)
 }
 
 func (self *Gwyneth) AddFilter(title string, regex_title bool, body string, regex_body bool, action_id *model.Id) (*filter.Filter, error) {
@@ -492,7 +629,7 @@ func (self *Gwyneth) addFilter(title string, regex_title bool, body string, rege
 		return nil, err
 	}
 
-	self.update_filter.Notice()
+	self.filter_cond.Notice()
 	return f, nil
 }
 
@@ -506,7 +643,7 @@ func (self *Gwyneth) updateFilterAction(id *model.Id, action_id *model.Id) (*fil
 		return nil, err
 	}
 
-	self.update_filter.Notice()
+	self.filter_cond.Notice()
 	return f, nil
 }
 
@@ -535,7 +672,7 @@ func (self *Gwyneth) deleteFilter(id *model.Id) error {
 		return err
 	}
 
-	self.update_filter.Notice()
+	self.filter_cond.Notice()
 	return nil
 }
 
@@ -548,7 +685,7 @@ func (self *Gwyneth) bindFilter(src_id *model.Id, f_id *model.Id) error {
 		return err
 	}
 
-	self.update_filter.Notice()
+	self.filter_cond.Notice()
 	return nil
 }
 
@@ -561,7 +698,7 @@ func (self *Gwyneth) unBindFilter(src_id *model.Id, f_id *model.Id) error {
 		return err
 	}
 
-	self.update_filter.Notice()
+	self.filter_cond.Notice()
 	return nil
 }
 
@@ -602,22 +739,6 @@ func (self *Gwyneth) ReFilter(src_id *model.Id, limit int64) error {
 		}
 	}(self.msn.New())
 	return nil
-}
-
-func action_filter(msn *task.Mission, args ...any) {
-	defer msn.Done()
-
-	logger := args[0].(*slog.Logger)
-	action := args[1].(*filter.Action)
-	artcl := args[2].(*model.Article)
-
-	if task.IsCanceled(msn) {
-		logger.Info("the filter's action is canceld")
-		return
-	}
-	if err := action.Do(msn.New(), logger, artcl); err != nil {
-		logger.Error("failed: execute filter: %s", err)
-	}
 }
 
 func makeFailedStatus(s string, msg ...any) *model.Status {
@@ -750,4 +871,45 @@ func (sm *statusManager) Get(id *model.Id) []*model.Status {
 	ret_sts := make([]*model.Status, len(sts))
 	copy(ret_sts, sts)
 	return ret_sts
+}
+
+type actionManagerIndex struct {
+	idx map[string]*filter.ActionManager
+	mtx *sync.RWMutex
+}
+
+func newActionManagerIndex() *actionManagerIndex {
+	return &actionManagerIndex{
+		idx: map[string]*filter.ActionManager{},
+		mtx: new(sync.RWMutex),
+	}
+}
+
+func (self *actionManagerIndex) Get(id *model.Id) (*filter.ActionManager, error) {
+	self.mtx.RLock()
+	defer self.mtx.RUnlock()
+
+	mgr, ok := self.idx[id.String()]
+	if !ok {
+		return nil, fmt.Errorf("an ActionManager is not loaded")
+	}
+	return mgr, nil
+}
+
+func (self *actionManagerIndex) Add(id *model.Id, mgr *filter.ActionManager) {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	self.idx[id.String()] = mgr
+}
+
+func (self *actionManagerIndex) Delete(id *model.Id) {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	_, ok := self.idx[id.String()]
+	if !ok {
+		return
+	}
+	delete(self.idx, id.String())
 }

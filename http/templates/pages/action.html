@@ -22,7 +22,6 @@
 	<table class="table table-bordered table-hover" id="actionsTable">
 		<thead class="table-dark">
 			<tr>
-				<th id="th-id" onclick="sortTable('id')" style="cursor:pointer">ID</th>
 				<th id="th-name" onclick="sortTable('name')" style="cursor:pointer">Name</th>
 				<th id="th-command" onclick="sortTable('command')" style="cursor:pointer">Command</th>
 				<th>Action</th>
@@ -57,14 +56,15 @@
 		body.innerHTML = '';
 		actionsData.forEach(action => {
 			const row = document.createElement('tr');
+			row.onclick = () => window.location.href = `action/${action.id}`;
+			row.style.cursor = 'pointer';
 			row.innerHTML = `
-		<td>${action.id}</td>
-		<td>${action.name}</td>
-		<td>${action.command}</td>
-		<td>
-		  <button class="btn btn-sm btn-danger" onclick="deleteAction('${action.id}')">Delete</button>
-		</td>
-	  `;
+				<td>${action.name}</td>
+				<td>${action.command}</td>
+				<td>
+					<button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteAction('${action.id}')">Delete</button>
+				</td>
+			`;
 			body.appendChild(row);
 		});
 	}
@@ -96,7 +96,7 @@
 	}
 
 	function updateSortIcons() {
-		const headers = ['id', 'name', 'command'];
+		const headers = ['name', 'command'];
 		headers.forEach(col => {
 			const th = document.getElementById(`th-${col}`);
 			if (currentSort.column === col) {

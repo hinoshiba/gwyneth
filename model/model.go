@@ -103,6 +103,19 @@ func (self *SourceType) ConvertExternal() *external.SourceType {
 	}
 }
 
+func ImportExternalSourceType(ex_stype *external.SourceType) (*SourceType, error) {
+	id, err := ParseStringId(ex_stype.Id)
+	if err != nil {
+		return nil, err
+	}
+	return &SourceType {
+		id: id,
+		name: ex_stype.Name,
+		cmd: ex_stype.Cmd,
+		user_create: ex_stype.UserCreate,
+	}, nil
+}
+
 type Source struct {
 	id       *Id
 	title    string
@@ -151,6 +164,25 @@ func (self *Source) ConvertExternal() *external.Source {
 
 		Status: []*external.Status{},
 	}
+}
+
+func ImportExternalSource(ex_src *external.Source) (*Source, error) {
+	id, err := ParseStringId(ex_src.Id)
+	if err != nil {
+		return nil, err
+	}
+	src_type, err := ImportExternalSourceType(ex_src.Type)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Source {
+		id: id,
+		title: ex_src.Title,
+		src_type: src_type,
+		val: ex_src.Value,
+		pause: ex_src.Pause,
+	}, nil
 }
 
 type Article struct {
@@ -213,6 +245,27 @@ func (self *Article) ConvertExternal() *external.Article {
 		Timestamp: int(self.utime),
 		Raw: self.raw,
 	}
+}
+
+func ImportExternalArticle(ex_article *external.Article) (*Article, error) {
+	id, err := ParseStringId(ex_article.Id)
+	if err != nil {
+		return nil, err
+	}
+	src, err := ImportExternalSource(ex_article.Src)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Article{
+		id: id,
+		src: src,
+		title: ex_article.Title,
+		body: ex_article.Body,
+		link: ex_article.Link,
+		utime: int64(ex_article.Timestamp),
+		raw: ex_article.Raw,
+	}, nil
 }
 
 type Status struct {
