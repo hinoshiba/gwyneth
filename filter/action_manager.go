@@ -26,6 +26,7 @@ type ActionManager struct {
 
 	path_q    string
 	path_tmp  string
+	path_wip  string
 	path_dlq  string
 
 	logger    *slog.Logger
@@ -48,6 +49,10 @@ func NewActionManager(msn *task.Mission, action *Action, cfg *config.Action, log
 	if err := os.MkdirAll(path_tmp, 0755); err != nil {
 		return nil, err
 	}
+	path_wip := filepath.Join(path_qbase, "wip")
+	if err := os.MkdirAll(path_wip, 0755); err != nil {
+		return nil, err
+	}
 	path_dlq := filepath.Join(path_qbase, "deadletter")
 	if err := os.MkdirAll(path_dlq, 0755); err != nil {
 		return nil, err
@@ -58,6 +63,7 @@ func NewActionManager(msn *task.Mission, action *Action, cfg *config.Action, log
 
 		path_q: path_q,
 		path_tmp: path_tmp,
+		path_wip: path_wip,
 		path_dlq: path_dlq,
 
 		logger: logger,
@@ -197,6 +203,25 @@ func (self *ActionManager) run_f_watcher() {
 	}(self.msn.New())
 
 	go func (msn *task.Mission) {
+		fs, err := os.ReadDir(self.path_wip)
+		if err != nil {
+			slog.Error("cannot read %s queue: %s", self.path_wip, err)
+			return
+		}
+
+		for _, f := range fs {
+			if f.IsDir() {
+				continue
+			}
+			select {
+			case <- msn.RecvCancel():
+				return
+			case self.fpath_ch <- filepath.Join(self.path_q, f.Name()):
+			}
+		}
+	}(self.msn.New())
+
+	go func (msn *task.Mission) {
 		fs, err := os.ReadDir(self.path_q)
 		if err != nil {
 			slog.Error("cannot read %s queue: %s", self.path_q, err)
@@ -226,11 +251,6 @@ func (self *ActionManager) task_handler(msn *task.Mission) {
 			func(msn *task.Mission) {
 				defer msn.Done()
 
-				if _, err := os.Stat(q_fpath); os.IsNotExist(err) {
-					self.logger.Warn("%s is not exist", q_fpath)
-					return
-				}
-
 				cc := self.getSessionCanceller()
 				go func () {
 					select {
@@ -241,19 +261,30 @@ func (self *ActionManager) task_handler(msn *task.Mission) {
 					}
 				}()
 
-				if err := self.action.Do(msn.New(), self.logger, q_fpath); err != nil {
+				if _, err := os.Stat(q_fpath); os.IsNotExist(err) {
+					self.logger.Warn("%s is not exist", q_fpath)
+					return
+				}
+
+				fname := filepath.Base(q_fpath)
+				wip_f_path := filepath.Join(self.path_wip, fname)
+				if err := os.Rename(q_fpath, wip_f_path); err != nil {
+					self.logger.Error("Cannot mv wip file: %s -> %s: %s", q_fpath, wip_f_path, err)
+					return
+				}
+
+				if err := self.action.Do(msn.New(), self.logger, wip_f_path); err != nil {
 					self.logger.Error("%s Action Failed: %s", self.action.Name(), err)
 
-					fname := filepath.Base(q_fpath)
 					dlq_f_path := filepath.Join(self.path_dlq, fname)
-					slog.Debug("mv %s %s", q_fpath, dlq_f_path)
-					if err := os.Rename(q_fpath, dlq_f_path); err != nil {
-						slog.Error("cannot move to dlq: src: %s, dst: %s, err: %s", q_fpath, dlq_f_path, err)
+					slog.Debug("mv %s %s", wip_f_path, dlq_f_path)
+					if err := os.Rename(wip_f_path, dlq_f_path); err != nil {
+						slog.Error("cannot move to dlq: src: %s, dst: %s, err: %s", wip_f_path, dlq_f_path, err)
 					}
 					return
 				}
-				if err := os.Remove(q_fpath); err != nil {
-					slog.Error("cannot rm q file: %s, err: %s", q_fpath, err)
+				if err := os.Remove(wip_f_path); err != nil {
+					slog.Error("cannot rm q file: %s, err: %s", wip_f_path, err)
 				}
 			}(msn.New())
 		}
