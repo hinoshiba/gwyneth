@@ -14,3 +14,8 @@ feed:
   author_name: hinoshiba
   author_email: hinoshiba@example.com
   default_type: rss
+log:
+  level: debug
+  dir: "/var/gwyneth/var/log/"
+action:
+  queue_dir: "/var/gwyneth/var/action/queue/"
